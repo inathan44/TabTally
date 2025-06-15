@@ -1,20 +1,111 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+model User {
+  id        String    @id @default(cuid())
+  username  String    @unique
+  email     String    @unique
+  firstName String
+  lastName  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-    @@index([name])
+  createdGroups              Group[]             @relation("GroupCreator")
+  memberships                GroupMember[]       @relation("GroupMemberships")
+  sentInvitations            GroupMember[]       @relation("GroupInvitations")
+  createdTransactions        Transaction[]       @relation("TransactionCreator")
+  paidTransactions           Transaction[]       @relation("TransactionPayer")
+  receivedTransactionDetails TransactionDetail[] @relation("TransactionRecipients")
+
+  @@index([email])
+}
+
+model Group {
+  id          Int       @id @default(autoincrement())
+  name        String
+  createdById String
+  createdBy   User      @relation("GroupCreator", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  members            GroupMember[]
+  transactions       Transaction[]
+  transactionDetails TransactionDetail[]
+
+  @@index([name])
+}
+
+enum GroupMemberStatus {
+  INVITED
+  JOINED
+  LEFT
+  DECLINED
+  KICKED
+  BANNED
+}
+
+model GroupMember {
+  id          Int               @id @default(autoincrement())
+  groupId     Int
+  group       Group             @relation(fields: [groupId], references: [id])
+  memberId    String
+  member      User              @relation("GroupMemberships", fields: [memberId], references: [id])
+  invitedById String
+  invitedBy   User              @relation("GroupInvitations", fields: [invitedById], references: [id])
+  isAdmin     Boolean           @default(false)
+  status      GroupMemberStatus @default(INVITED)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([groupId, memberId])
+  @@index([memberId])
+  @@index([invitedById])
+}
+
+model Transaction {
+  id          Int       @id @default(autoincrement())
+  createdById String
+  createdBy   User      @relation("TransactionCreator", fields: [createdById], references: [id])
+  payerId     String
+  payer       User      @relation("TransactionPayer", fields: [payerId], references: [id])
+  amount      Decimal   @db.Decimal(10, 2)
+  description String?   @db.VarChar(255)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  groupId     Int
+  group       Group     @relation(fields: [groupId], references: [id])
+
+  transactionDetails TransactionDetail[]
+
+  @@index([groupId])
+  @@index([createdById])
+  @@index([payerId])
+}
+
+model TransactionDetail {
+  id            Int         @id @default(autoincrement())
+  transactionId Int
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  recipientId   String
+  recipient     User        @relation("TransactionRecipients", fields: [recipientId], references: [id])
+  groupId       Int
+  group         Group       @relation(fields: [groupId], references: [id])
+  amount        Decimal     @db.Decimal(10, 2)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+
+  @@index([transactionId])
+  @@index([recipientId])
+  @@index([groupId])
 }
