@@ -101,6 +101,16 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 });
 
 const authMiddleware = t.middleware(async ({ next, ctx }) => {
+  if (process.env.NODE_ENV === "test" && process.env.BYPASS_AUTH === "true") {
+    const result = await next({
+      ctx: {
+        ...ctx,
+        userId: ctx.userId ?? "test-user-id",
+      },
+    });
+    return result;
+  }
+
   if (!ctx.userId) {
     console.warn("[TRPC] Unauthorized access - missing userId or sessionId");
     throw new TRPCError({

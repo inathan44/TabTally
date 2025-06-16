@@ -17,6 +17,7 @@ export const userRouter = createTRPCRouter({
       );
 
       if (error !== null) {
+        console.error("Error fetching user:", error);
         return {
           data: null,
           error: {
@@ -30,6 +31,7 @@ export const userRouter = createTRPCRouter({
       }
 
       if (!user) {
+        console.warn("User not found for ID:", input);
         return {
           data: null,
           error: {
@@ -40,6 +42,7 @@ export const userRouter = createTRPCRouter({
         };
       }
 
+      console.log("User found:", user.id);
       const safeUser: SafeUser = {
         id: user.id,
         username: user.username,
