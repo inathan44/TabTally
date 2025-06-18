@@ -7,7 +7,7 @@ import type { SafeUser } from "~/server/contracts/users";
 
 export const userRouter = createTRPCRouter({
   getUserById: protectedProcedure
-    .input(z.string())
+    .input(z.string().min(1))
     .query(async ({ ctx, input }): Promise<ApiResponse<SafeUser>> => {
       const { data: user, error } = await withCatch(
         async () =>
@@ -25,7 +25,6 @@ export const userRouter = createTRPCRouter({
               error.message ||
               "An error occurred while getting user information. Please try again later.",
             code: "INTERNAL_SERVER_ERROR",
-            status: 500,
           },
         };
       }
@@ -37,7 +36,6 @@ export const userRouter = createTRPCRouter({
           error: {
             message: "User not found",
             code: "NOT_FOUND",
-            status: 404,
           },
         };
       }
@@ -45,7 +43,6 @@ export const userRouter = createTRPCRouter({
       console.log("User found:", user.id);
       const safeUser: SafeUser = {
         id: user.id,
-        username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
         createdAt: user.createdAt,

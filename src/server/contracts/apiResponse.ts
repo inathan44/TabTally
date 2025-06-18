@@ -1,12 +1,18 @@
+type ErrorCodes =
+  | "NOT_FOUND"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "INTERNAL_SERVER_ERROR"
+  | "BAD_REQUEST";
+
 type SuccessResponse<T> = {
   data: T;
   error: null;
 };
 
-type ErrObject = {
+type ErrObject<E = ErrorCodes> = {
   message: string;
-  code: string;
-  status: number;
+  code: E;
 };
 
 type ErrorResponse<E = ErrObject> = {

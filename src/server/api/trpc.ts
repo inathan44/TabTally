@@ -9,9 +9,9 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { auth } from "@clerk/nextjs/server";
-
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { db } from "~/server/db";
+import { withCatch } from "~/lib/utils";
 
 /**
  * 1. CONTEXT
@@ -101,7 +101,8 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 });
 
 const authMiddleware = t.middleware(async ({ next, ctx }) => {
-  if (process.env.NODE_ENV === "test" && process.env.BYPASS_AUTH === "true") {
+  if (isTestEnvironment()) {
+    console.log("[TRPC] Bypassing auth middleware in test environment");
     const result = await next({
       ctx: {
         ...ctx,
@@ -128,14 +129,94 @@ const authMiddleware = t.middleware(async ({ next, ctx }) => {
   return result;
 });
 
-/**
- * Public (unauthenticated) procedure
- *
- * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
- * guarantee that a user querying is authorized, but you can still access user session data if they
- * are logged in.
- */
+const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
+  if (isTestEnvironment()) {
+    console.log("[TRPC] Bypassing findorcreate middleware in test environment");
+
+    const result = await next({
+      ctx: {
+        ...ctx,
+        userId: ctx.userId ?? "test-user-id",
+      },
+    });
+    return result;
+  }
+
+  if (!ctx.userId) {
+    console.warn("[TRPC] Unauthorized access - missing userId");
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Unauthorized - missing userId",
+    });
+  }
+
+  const client = await clerkClient();
+
+  const { emailAddresses, firstName, lastName, id } =
+    await client.users.getUser(ctx.userId);
+
+  const userInDatabase = await ctx.db.user.findUnique({
+    where: { id: ctx.userId },
+  });
+
+  if (userInDatabase) {
+    return next();
+  }
+
+  if (
+    !emailAddresses ||
+    emailAddresses.length === 0 ||
+    !emailAddresses[0]?.emailAddress
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "User does not have an email address",
+    });
+  }
+
+  if (ctx.userId !== id) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "User ID does not match session user ID",
+    });
+  }
+
+  console.log(
+    "[TRPC] User not found creating new user in database:",
+    ctx.userId,
+  );
+
+  const { data, error } = await withCatch(
+    async () =>
+      await ctx.db.user.create({
+        data: {
+          id: ctx.userId!,
+          email: emailAddresses[0]!.emailAddress,
+          firstName: firstName ?? "default",
+          lastName: lastName ?? "default",
+        },
+      }),
+  );
+
+  if (error !== null) {
+    console.error("[TRPC] Error creating user in database:", error);
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Create user middleware failed: ${error?.message}`,
+    });
+  }
+
+  console.log("[TRPC] User created in database:", data.id);
+
+  return next();
+});
+
 export const publicProcedure = t.procedure.use(timingMiddleware);
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
-  .use(authMiddleware);
+  .use(authMiddleware)
+  .use(findOrCreateUserMiddleware);
+
+function isTestEnvironment() {
+  return process.env.NODE_ENV === "test" && process.env.BYPASS_AUTH === "true";
+}

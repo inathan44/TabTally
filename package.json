@@ -9,7 +9,6 @@
     "db:generate": "prisma migrate dev",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
-    "db:push-test": "NODE_ENV=test prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "NODE_ENV=development node prisma/seed.js",
     "dev": "next dev --turbo",
