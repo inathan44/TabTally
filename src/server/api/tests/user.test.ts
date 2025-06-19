@@ -136,4 +136,85 @@ describe("User API Tests", () => {
       });
     });
   });
+
+  describe("getGroups - Unit Tests with Database", () => {
+    let createdGroupIds: number[] = [];
+
+    beforeEach(async () => {
+      // Mock the context to use our test user for group creation
+      const testCtx = { ...ctx, userId: EXISTING_TEST_USER };
+      const testCaller = createCaller(testCtx);
+
+      // Create test groups using the actual createGroup method
+      const group1Result = await testCaller.group.createGroup({
+        name: "Test Group 1",
+        description: "Test description 1",
+      });
+
+      const group2Result = await testCaller.group.createGroup({
+        name: "Test Group 2",
+        description: "Test description 2",
+      });
+
+      // Verify groups were created successfully
+      expect(group1Result.error).toBeNull();
+      expect(group2Result.error).toBeNull();
+      expect(group1Result.data).toBeDefined();
+      expect(group2Result.data).toBeDefined();
+
+      createdGroupIds = [group1Result.data!.id, group2Result.data!.id];
+    });
+
+    afterEach(async () => {
+      if (createdGroupIds.length > 0) {
+        const testCtx = { ...ctx, userId: EXISTING_TEST_USER };
+        const testCaller = createCaller(testCtx);
+
+        for (const groupId of createdGroupIds) {
+          const deleteResult = await testCaller.group.deleteGroup({
+            groupId: groupId,
+            hard: true,
+          });
+
+          expect(deleteResult.error).toBeNull();
+        }
+
+        createdGroupIds = [];
+      }
+    });
+
+    it("should return groups for the user", async () => {
+      // Mock the context to use our test user
+      const testCtx = { ...ctx, userId: EXISTING_TEST_USER };
+      const testCaller = createCaller(testCtx);
+
+      const result = await testCaller.user.getGroups();
+
+      expect(result.error).toBeNull();
+      expect(result.data).toBeDefined();
+      expect(result.data).toHaveLength(2);
+
+      // Verify the groups contain expected data
+      expect(result.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "Test Group 1",
+          }),
+          expect.objectContaining({
+            name: "Test Group 2",
+          }),
+        ]),
+      );
+
+      // Verify each group has the correct structure
+      result.data!.forEach((group) => {
+        expect(group).toHaveProperty("id");
+        expect(group).toHaveProperty("name");
+        expect(group).toHaveProperty("slug");
+        expect(group).toHaveProperty("createdAt");
+        expect(group).toHaveProperty("groupUsers");
+        expect(Array.isArray(group.groupUsers)).toBe(true);
+      });
+    });
+  });
 });

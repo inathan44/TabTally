@@ -6,6 +6,14 @@ export type SafeUser = Pick<
   "id" | "firstName" | "lastName" | "createdAt"
 >;
 
+export type GetUserGroupsResponse = {
+  id: number;
+  name: string;
+  slug: string;
+  createdAt: Date;
+  groupUsers: SafeUser[];
+};
+
 const firstName = z.string().min(1).max(50);
 const lastName = z.string().min(1).max(50);
 const email = z.string().email().max(100);

@@ -3,7 +3,7 @@ import { withCatch } from "~/lib/utils";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import type { ApiResponse } from "~/server/contracts/apiResponse";
-import type { SafeUser } from "~/server/contracts/users";
+import type { GetUserGroupsResponse, SafeUser } from "~/server/contracts/users";
 
 export const userRouter = createTRPCRouter({
   getUserById: protectedProcedure
@@ -50,4 +50,64 @@ export const userRouter = createTRPCRouter({
 
       return { data: safeUser, error: null };
     }),
+  getGroups: protectedProcedure.query(
+    async ({ ctx }): Promise<ApiResponse<GetUserGroupsResponse[]>> => {
+      const { data: groups, error } = await withCatch(
+        async () =>
+          await ctx.db.group.findMany({
+            where: {
+              members: { some: { memberId: ctx.userId, status: "JOINED" } },
+            },
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              createdAt: true,
+              members: {
+                where: {
+                  status: "JOINED",
+                },
+                select: {
+                  member: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      createdAt: true,
+                    },
+                  },
+                },
+              },
+            },
+          }),
+      );
+
+      if (error !== null) {
+        console.error("Error fetching user groups:", error);
+        return {
+          data: null,
+          error: {
+            message:
+              "An error occurred while getting user groups. Please try again later.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      const userGroups: GetUserGroupsResponse[] = groups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        slug: group.slug,
+        createdAt: group.createdAt,
+        groupUsers: group.members.map((member) => ({
+          id: member.member.id,
+          firstName: member.member.firstName,
+          lastName: member.member.lastName,
+          createdAt: member.member.createdAt,
+        })),
+      }));
+
+      return { data: userGroups, error: null };
+    },
+  ),
 });
