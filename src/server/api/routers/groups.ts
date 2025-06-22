@@ -81,17 +81,17 @@ export const groupRouter = createTRPCRouter({
       return { data, error: null };
     }),
 
-  getGroupById: protectedProcedure
-    .input(z.object({ id: z.number() }))
+  getGroupBySlug: protectedProcedure
+    .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }): Promise<ApiResponse<Group>> => {
-      const { data, error } = await withCatch(async () => {
+      const { data: group, error: groupError } = await withCatch(async () => {
         return await ctx.db.group.findUnique({
-          where: { id: input.id },
+          where: { slug: input.slug },
         });
       });
 
-      if (error !== null) {
-        console.error("Error fetching group:", error);
+      if (groupError !== null) {
+        console.error("Error fetching group:", groupError);
         return {
           data: null,
           error: {
@@ -101,7 +101,8 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      if (!data) {
+      if (!group) {
+        console.error("Group not found for slug:", input.slug);
         return {
           data: null,
           error: {
@@ -111,7 +112,42 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      return { data, error: null };
+      const { data: isMember, error: isMemberError } = await withCatch(
+        async () => {
+          return await ctx.db.groupMember.findFirst({
+            where: {
+              groupId: group.id,
+              memberId: ctx.userId,
+            },
+          });
+        },
+      );
+
+      if (isMemberError !== null) {
+        console.error("Error checking group membership:", isMemberError);
+        return {
+          data: null,
+          error: {
+            message: "An error occurred while checking group membership.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      if (!isMember) {
+        console.warn("User is not a member of the group:", ctx.userId);
+        return {
+          data: null,
+          error: {
+            message: "You are not a member of this group",
+            code: "FORBIDDEN",
+          },
+        };
+      }
+
+      console.log("Group fetched successfully:", group.slug);
+
+      return { data: group, error: null };
     }),
 
   deleteGroup: protectedProcedure

@@ -63,6 +63,7 @@ export const userRouter = createTRPCRouter({
               name: true,
               slug: true,
               createdAt: true,
+              createdById: true,
               members: {
                 where: {
                   status: "JOINED",
@@ -99,6 +100,7 @@ export const userRouter = createTRPCRouter({
         name: group.name,
         slug: group.slug,
         createdAt: group.createdAt,
+        createdById: group.createdById,
         groupUsers: group.members.map((member) => ({
           id: member.member.id,
           firstName: member.member.firstName,

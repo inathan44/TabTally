@@ -11,6 +11,7 @@ export type GetUserGroupsResponse = {
   name: string;
   slug: string;
   createdAt: Date;
+  createdById: string;
   groupUsers: SafeUser[];
 };
 

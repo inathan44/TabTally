@@ -191,9 +191,14 @@ const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
       await ctx.db.user.create({
         data: {
           id: ctx.userId!,
-          email: emailAddresses[0]!.emailAddress,
-          firstName: firstName ?? "default",
-          lastName: lastName ?? "default",
+          email: emailAddresses[0]!.emailAddress.toLowerCase(),
+          firstName: firstName
+            ? firstName.charAt(0).toUpperCase() +
+              firstName.slice(1).toLowerCase()
+            : "default",
+          lastName: lastName
+            ? lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase()
+            : "default",
         },
       }),
   );

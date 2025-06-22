@@ -24,7 +24,7 @@ const createPrismaClient = () =>
     },
     log:
       env.NODE_ENV === "development" || env.NODE_ENV === "test"
-        ? ["query", "error", "warn"]
+        ? ["error", "warn"]
         : ["error"],
   });
 
