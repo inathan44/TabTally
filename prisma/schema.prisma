@@ -48,9 +48,6 @@ model Group {
 enum GroupMemberStatus {
   INVITED
   JOINED
-  LEFT
-  DECLINED
-  KICKED
   BANNED
 }
 

@@ -49,8 +49,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
       ...shape,
       data: {
         ...shape.data,
-        zodError:
-          error.cause instanceof ZodError ? error.cause.flatten() : null,
+        zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
       },
     };
   },
@@ -152,8 +151,7 @@ const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
 
   const client = await clerkClient();
 
-  const { emailAddresses, firstName, lastName, id } =
-    await client.users.getUser(ctx.userId);
+  const { emailAddresses, firstName, lastName, id } = await client.users.getUser(ctx.userId);
 
   const userInDatabase = await ctx.db.user.findUnique({
     where: { id: ctx.userId },
@@ -163,11 +161,7 @@ const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
     return next();
   }
 
-  if (
-    !emailAddresses ||
-    emailAddresses.length === 0 ||
-    !emailAddresses[0]?.emailAddress
-  ) {
+  if (!emailAddresses || emailAddresses.length === 0 || !emailAddresses[0]?.emailAddress) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "User does not have an email address",
@@ -181,10 +175,7 @@ const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
     });
   }
 
-  console.log(
-    "[TRPC] User not found creating new user in database:",
-    ctx.userId,
-  );
+  console.log("[TRPC] User not found creating new user in database:", ctx.userId);
 
   const { data, error } = await withCatch(
     async () =>
@@ -192,13 +183,8 @@ const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
         data: {
           id: ctx.userId!,
           email: emailAddresses[0]!.emailAddress.toLowerCase(),
-          firstName: firstName
-            ? firstName.charAt(0).toUpperCase() +
-              firstName.slice(1).toLowerCase()
-            : "default",
-          lastName: lastName
-            ? lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase()
-            : "default",
+          firstName: firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase() : "default",
+          lastName: lastName ? lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase() : "default",
         },
       }),
   );
@@ -217,10 +203,9 @@ const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
 });
 
 export const publicProcedure = t.procedure.use(timingMiddleware);
-export const protectedProcedure = t.procedure
-  .use(timingMiddleware)
-  .use(authMiddleware)
-  .use(findOrCreateUserMiddleware);
+export const protectedProcedure = t.procedure.use(timingMiddleware).use(authMiddleware).use(findOrCreateUserMiddleware);
+
+export type TRPCContext = Awaited<ReturnType<typeof createTRPCContext>>;
 
 function isTestEnvironment() {
   return process.env.NODE_ENV === "test" && process.env.BYPASS_AUTH === "true";

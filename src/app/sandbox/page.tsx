@@ -6,8 +6,6 @@ export default async function Sandbox() {
   const { userId } = await auth();
   const user = await api.user.getUserById(userId ?? "");
 
-  console.log("User:", user);
-
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-8">
       <h1 className="text-2xl font-bold">Sandbox - Test Area</h1>
