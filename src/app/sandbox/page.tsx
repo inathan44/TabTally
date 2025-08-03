@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { api } from "~/trpc/server";
 import { TestGroupCreation } from "./TestGroupCreation";
+import { TestTransactionCreation } from "./TestTransactionCreation";
+import AnimatedButtonExample from "~/components/AnimatedButtonExample";
 
 export default async function Sandbox() {
   const { userId } = await auth();
@@ -23,6 +25,12 @@ export default async function Sandbox() {
       </div>
 
       <TestGroupCreation />
+
+      <TestTransactionCreation />
+
+      <div className="border-t pt-8">
+        <AnimatedButtonExample />
+      </div>
     </div>
   );
 }

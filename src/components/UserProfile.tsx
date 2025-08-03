@@ -9,26 +9,13 @@ interface UserProfileProps {
   className?: string;
 }
 
-export function UserProfile({
-  name,
-  phone,
-  avatarUrl,
-  className = "",
-}: UserProfileProps) {
+export function UserProfile({ name, phone, avatarUrl, className = "" }: UserProfileProps) {
   return (
-    <div
-      className={`flex flex-col items-center space-y-4 py-8 text-center md:space-y-6 md:py-12 ${className}`}
-    >
+    <div className={`flex flex-col items-center space-y-4 py-8 text-center md:space-y-6 md:py-12 ${className}`}>
       {/* User Avatar */}
       <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-red-400 via-orange-400 to-yellow-400 md:h-32 md:w-32">
         {avatarUrl ? (
-          <Image
-            src={avatarUrl}
-            alt={name}
-            width={128}
-            height={128}
-            className="h-full w-full object-cover"
-          />
+          <Image src={avatarUrl} alt={name} width={128} height={128} className="h-full w-full object-cover" />
         ) : (
           <span className="text-3xl font-bold text-white md:text-4xl">
             {name

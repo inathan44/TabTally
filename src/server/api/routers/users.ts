@@ -75,6 +75,9 @@ export const userRouter = createTRPCRouter({
               },
             },
           },
+          orderBy: {
+            createdAt: "desc",
+          },
         }),
     );
 
@@ -113,6 +116,7 @@ export const userRouter = createTRPCRouter({
         await ctx.db.user.findUnique({
           where: {
             email: email,
+            deletedAt: null,
           },
           select: {
             id: true,
@@ -134,7 +138,7 @@ export const userRouter = createTRPCRouter({
       };
     }
 
-    if (user === null) {
+    if (user === null || user.id === ctx.userId) {
       console.warn("User not found for email:", email);
       return {
         data: null,

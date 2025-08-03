@@ -4,6 +4,7 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 
 import { TRPCReactProvider } from "~/trpc/react";
+import Navbar from "~/components/Navbar";
 
 import {
   ClerkProvider,
@@ -11,7 +12,6 @@ import {
   SignUpButton,
   SignedIn,
   SignedOut,
-  UserButton,
 } from "@clerk/nextjs";
 
 export const metadata: Metadata = {
@@ -33,16 +33,32 @@ export default function RootLayout({
       <html lang="en" className={`${geist.variable}`}>
         <body className={`${geist.variable} antialiased`}>
           <TRPCReactProvider>
-            <header className="flex h-16 items-center justify-end gap-4 p-4">
+            <div className="min-h-screen bg-gray-50">
               <SignedOut>
-                <SignInButton />
-                <SignUpButton />
+                <div className="flex min-h-screen items-center justify-center">
+                  <div className="rounded-lg bg-white p-8 shadow-md">
+                    <h1 className="mb-4 text-2xl font-bold text-center">TabTally</h1>
+                    <p className="mb-6 text-gray-600 text-center">Please sign in to continue</p>
+                    <div className="flex gap-4 justify-center">
+                      <SignInButton mode="modal">
+                        <button className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600">
+                          Sign In
+                        </button>
+                      </SignInButton>
+                      <SignUpButton mode="modal">
+                        <button className="rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600">
+                          Sign Up
+                        </button>
+                      </SignUpButton>
+                    </div>
+                  </div>
+                </div>
               </SignedOut>
               <SignedIn>
-                <UserButton />
+                <Navbar />
+                <main>{children}</main>
               </SignedIn>
-            </header>
-            {children}
+            </div>
           </TRPCReactProvider>
         </body>
       </html>
