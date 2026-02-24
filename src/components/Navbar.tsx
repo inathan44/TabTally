@@ -6,7 +6,9 @@ import { SignedIn, UserButton } from "@clerk/nextjs";
 import { useState } from "react";
 import { Menu, Receipt } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
+import { cn } from "~/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -23,6 +25,9 @@ export default function Navbar() {
   const navItems = [
     { href: "/", label: "Home" },
     { href: "/groups", label: "Groups" },
+    ...(process.env.NODE_ENV === "development"
+      ? [{ href: "/sandbox", label: "Playground" }]
+      : []),
   ];
 
   const isActive = (href: string) => {
@@ -42,6 +47,11 @@ export default function Navbar() {
               <span className="text-sm font-semibold tracking-tight text-foreground">
                 TabTally
               </span>
+              {process.env.NODE_ENV === "development" && (
+                <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+                  DEV
+                </Badge>
+              )}
             </Link>
 
             <Separator orientation="vertical" className="hidden h-5 sm:block" />
@@ -54,11 +64,13 @@ export default function Navbar() {
                   asChild
                   variant="ghost"
                   size="sm"
-                  className={`h-8 px-3 text-[13px] font-medium ${
-                    isActive(item.href)
-                      ? "bg-accent text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={cn(
+                    "h-8 px-3 text-[13px] font-medium",
+                    {
+                      "bg-accent text-foreground": isActive(item.href),
+                      "text-muted-foreground hover:text-foreground": !isActive(item.href),
+                    },
+                  )}
                 >
                   <Link href={item.href}>{item.label}</Link>
                 </Button>
