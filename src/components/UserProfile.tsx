@@ -1,6 +1,7 @@
 import { Edit } from "lucide-react";
 import Image from "next/image";
 import { Button } from "./ui/button";
+import { cn } from "~/lib/utils";
 
 interface UserProfileProps {
   name: string;
@@ -11,7 +12,7 @@ interface UserProfileProps {
 
 export function UserProfile({ name, phone, avatarUrl, className = "" }: UserProfileProps) {
   return (
-    <div className={`flex flex-col items-center space-y-4 py-8 text-center md:space-y-6 md:py-12 ${className}`}>
+    <div className={cn("flex flex-col items-center space-y-4 py-8 text-center md:space-y-6 md:py-12", className)}>
       {/* User Avatar */}
       <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-red-400 via-orange-400 to-yellow-400 md:h-32 md:w-32">
         {avatarUrl ? (

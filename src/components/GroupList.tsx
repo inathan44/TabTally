@@ -3,6 +3,7 @@
 import { GroupCard } from "./GroupCard";
 import { api } from "~/trpc/react";
 import { useAuth } from "@clerk/nextjs";
+import { cn } from "~/lib/utils";
 
 interface GroupListProps {
   className?: string;
@@ -14,7 +15,7 @@ export function GroupList({ className }: GroupListProps) {
 
   if (isPending) {
     return (
-      <div className={`space-y-3 ${className}`}>
+      <div className={cn("space-y-3", className)}>
         {Array.from({ length: 3 }, (_, i) => (
           <div
             key={i}
@@ -33,7 +34,7 @@ export function GroupList({ className }: GroupListProps) {
 
   if (error) {
     return (
-      <div className={`rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center ${className}`}>
+      <div className={cn("rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center", className)}>
         <p className="font-medium text-destructive">Error loading groups</p>
         <p className="mt-1 text-sm text-muted-foreground">{error.message}</p>
       </div>
@@ -42,7 +43,7 @@ export function GroupList({ className }: GroupListProps) {
 
   if (result?.error) {
     return (
-      <div className={`rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center ${className}`}>
+      <div className={cn("rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center", className)}>
         <p className="font-medium text-destructive">Error loading groups</p>
         <p className="mt-1 text-sm text-muted-foreground">{result.error.message}</p>
       </div>
@@ -53,7 +54,7 @@ export function GroupList({ className }: GroupListProps) {
 
   if (!groups || groups.length === 0) {
     return (
-      <div className={`rounded-lg border-2 border-dashed border-border p-8 text-center ${className}`}>
+      <div className={cn("rounded-lg border-2 border-dashed border-border p-8 text-center", className)}>
         <p className="font-medium text-foreground">No groups yet</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Create your first group to get started.
@@ -63,7 +64,7 @@ export function GroupList({ className }: GroupListProps) {
   }
 
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className={cn("space-y-3", className)}>
       {groups.map((group) => (
         <GroupCard
           key={group.id}
