@@ -162,7 +162,10 @@ describe("User API Tests", () => {
       expect(group1Result.data).toBeDefined();
       expect(group2Result.data).toBeDefined();
 
-      createdGroupIds = [group1Result.data!.id, group2Result.data!.id];
+      // Look up group IDs by slug
+      const group1 = await testCaller.group.getGroupBySlug({ slug: group1Result.data! });
+      const group2 = await testCaller.group.getGroupBySlug({ slug: group2Result.data! });
+      createdGroupIds = [group1.data!.id, group2.data!.id];
     });
 
     afterEach(async () => {
