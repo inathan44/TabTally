@@ -1,29 +1,60 @@
-# Create T3 App
+# TabTally
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+A group expense tracking app. Built with [Next.js](https://nextjs.org), [tRPC](https://trpc.io), [Prisma](https://prisma.io), [Tailwind CSS](https://tailwindcss.com), and [Clerk](https://clerk.com) for auth.
 
-## What's next? How do I make an app with this?
+## Running locally
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+### 1. Install dependencies
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+```bash
+npm install
+```
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+### 2. Set up environment variables
 
-## Learn More
+Copy `.env.example` to `.env` and fill in the required values (Clerk keys, database URL, etc.).
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+### 3. Start the database
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+Starts a local Postgres instance in Docker:
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+```bash
+./start-database.sh
+```
 
-## How do I deploy this?
+### 4. Push the database schema
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+```bash
+npm run db:push
+```
+
+To seed with sample data:
+
+```bash
+npm run db:seed
+```
+
+### 5. Start the dev server
+
+The frontend and backend both run in a single Next.js process (tRPC API routes are part of the Next.js app):
+
+```bash
+npm run dev
+```
+
+App will be available at [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Useful commands
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start dev server (frontend + backend) |
+| `npm run build` | Production build |
+| `npm run db:push` | Push schema changes to the database |
+| `npm run db:generate` | Generate and run a migration |
+| `npm run db:studio` | Open Prisma Studio to browse the database |
+| `npm run db:seed` | Seed the database with sample data |
+| `npm test` | Run tests |
+| `npm run check` | Lint + typecheck |
