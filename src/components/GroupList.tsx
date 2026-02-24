@@ -14,55 +14,37 @@ export function GroupList({ className }: GroupListProps) {
 
   if (isPending) {
     return (
-      <div className={`space-y-4 md:space-y-6 ${className}`}>
-        <h2 className="text-sm font-medium tracking-wide text-gray-500 uppercase md:text-base">
-          Your Groups
-        </h2>
-        <div className="space-y-3 md:space-y-4">
-          {Array.from({ length: 3 }, (_, i) => (
-            <div
-              key={i}
-              className="flex animate-pulse items-center justify-between rounded-lg bg-gray-100 p-4 md:p-6"
-            >
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className="h-12 w-12 rounded-full bg-gray-200 md:h-14 md:w-14"></div>
-                <div className="space-y-2">
-                  <div className="h-4 w-32 rounded bg-gray-200"></div>
-                  <div className="h-3 w-24 rounded bg-gray-200"></div>
-                </div>
-              </div>
-              <div className="h-5 w-5 rounded bg-gray-200"></div>
+      <div className={`space-y-3 ${className}`}>
+        {Array.from({ length: 3 }, (_, i) => (
+          <div
+            key={i}
+            className="flex animate-pulse items-center gap-3 rounded-lg border border-border bg-card p-4"
+          >
+            <div className="h-10 w-10 rounded-full bg-muted" />
+            <div className="space-y-2">
+              <div className="h-4 w-32 rounded bg-muted" />
+              <div className="h-3 w-24 rounded bg-muted" />
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={`space-y-4 md:space-y-6 ${className}`}>
-        <h2 className="text-sm font-medium tracking-wide text-gray-500 uppercase md:text-base">
-          Your Groups
-        </h2>
-        <div className="py-8 text-center text-red-500 md:py-12">
-          <p className="md:text-lg">Error loading groups</p>
-          <p className="text-sm md:text-base">{error.message}</p>
-        </div>
+      <div className={`rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center ${className}`}>
+        <p className="font-medium text-destructive">Error loading groups</p>
+        <p className="mt-1 text-sm text-muted-foreground">{error.message}</p>
       </div>
     );
   }
 
   if (result?.error) {
     return (
-      <div className={`space-y-4 md:space-y-6 ${className}`}>
-        <h2 className="text-sm font-medium tracking-wide text-gray-500 uppercase md:text-base">
-          Your Groups
-        </h2>
-        <div className="py-8 text-center text-red-500 md:py-12">
-          <p className="md:text-lg">Error loading groups</p>
-          <p className="text-sm md:text-base">{result.error.message}</p>
-        </div>
+      <div className={`rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center ${className}`}>
+        <p className="font-medium text-destructive">Error loading groups</p>
+        <p className="mt-1 text-sm text-muted-foreground">{result.error.message}</p>
       </div>
     );
   }
@@ -71,36 +53,28 @@ export function GroupList({ className }: GroupListProps) {
 
   if (!groups || groups.length === 0) {
     return (
-      <div className={`space-y-4 md:space-y-6 ${className}`}>
-        <h2 className="text-sm font-medium tracking-wide text-gray-500 uppercase md:text-base">
-          Your Groups
-        </h2>
-        <div className="py-8 text-center text-gray-500 md:py-12">
-          <p className="md:text-lg">No groups yet</p>
-          <p className="text-sm md:text-base">Create or join your first group to get started</p>
-        </div>
+      <div className={`rounded-lg border-2 border-dashed border-border p-8 text-center ${className}`}>
+        <p className="font-medium text-foreground">No groups yet</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Create your first group to get started.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className={`space-y-4 md:space-y-6 ${className}`}>
-      <h2 className="text-sm font-medium tracking-wide text-gray-500 uppercase md:text-base">
-        Your Groups
-      </h2>
-      <div className="space-y-3 md:space-y-4">
-        {groups.map((group) => (
-          <GroupCard
-            key={group.id}
-            id={group.id.toString()}
-            name={group.name}
-            slug={group.slug}
-            balance={group.userBalance?.amount ?? 0}
-            balanceType={group.userBalance?.type ?? "receive"}
-            isOwner={group.createdById == userId}
-          />
-        ))}
-      </div>
+    <div className={`space-y-3 ${className}`}>
+      {groups.map((group) => (
+        <GroupCard
+          key={group.id}
+          id={group.id.toString()}
+          name={group.name}
+          slug={group.slug}
+          balance={group.userBalance?.amount ?? 0}
+          balanceType={group.userBalance?.type ?? "receive"}
+          isOwner={group.createdById == userId}
+        />
+      ))}
     </div>
   );
 }
