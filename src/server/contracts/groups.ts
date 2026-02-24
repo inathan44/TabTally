@@ -1,4 +1,4 @@
-import type { Group } from "@prisma/client";
+import type { Group, GroupMemberStatus } from "@prisma/client";
 import { z } from "zod";
 import type { SafeUser } from "./users";
 import type { SafeTransaction } from "./transactions";
@@ -27,6 +27,17 @@ export const deleteGroupSchema = z.object({
 export const inviteMemberSchema = z.object({
   groupId: groupId,
   inviteeUserId: z.string(),
+  role: z.enum(["user", "admin"]).default("user"),
+});
+
+export const uninviteMemberSchema = z.object({
+  groupId: groupId,
+  userId: z.string(),
+});
+
+export const restoreInviteSchema = z.object({
+  groupId: groupId,
+  userId: z.string(),
 });
 
 export const createTransactionSchema = z.object({
@@ -78,6 +89,7 @@ type SafeGroup = Pick<Group, "id" | "name" | "slug" | "createdAt" | "createdById
 
 export type GroupMember = SafeUser & {
   isAdmin: boolean;
+  status: GroupMemberStatus;
 };
 
 export type GetGroupResponse = SafeGroup & {
@@ -85,24 +97,30 @@ export type GetGroupResponse = SafeGroup & {
   transactions: SafeTransaction[];
 };
 
+const invitedUsersFormSchema = z.array(
+  z.object({
+    user: z.object({
+      id: z.string(),
+      firstName: z.string(),
+      lastName: z.string(),
+      email: z.string().email().optional(),
+    }),
+    role: z.enum(["user", "admin"]),
+  }),
+);
+
 // Form schema that includes full user objects for UI display
 export const createGroupFormSchema = z.object({
   name: groupName,
   description: groupDescription.optional(),
-  invitedUsers: z
-    .array(
-      z.object({
-        user: z.object({
-          id: z.string(),
-          firstName: z.string().optional(),
-          lastName: z.string().optional(),
-          email: z.string().email().optional(),
-        }),
-        role: z.enum(["user", "admin"]),
-      }),
-    )
-    .optional(),
+  invitedUsers: invitedUsersFormSchema.optional(),
 });
+
+export const inviteMembersFormSchema = z.object({
+  invitedUsers: invitedUsersFormSchema.min(1, "Select at least one user to invite"),
+});
+
+export type InviteMembersForm = z.infer<typeof inviteMembersFormSchema>;
 
 export type CreateGroupForm = z.infer<typeof createGroupFormSchema>;
 export type InvitedUser = z.infer<typeof invitedUserSchema>;

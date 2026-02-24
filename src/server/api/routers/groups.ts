@@ -7,6 +7,7 @@ import {
   createTRPCRouter,
   protectedProcedure,
   groupMemberProcedure,
+  groupAdminProcedure,
   type TRPCContext,
 } from "~/server/api/trpc";
 import type { ApiResponse } from "~/server/contracts/apiResponse";
@@ -15,6 +16,8 @@ import {
   createTransactionSchema,
   deleteGroupSchema,
   inviteMemberSchema,
+  uninviteMemberSchema,
+  restoreInviteSchema,
   type GetGroupResponse,
 } from "~/server/contracts/groups";
 import type { CreateTransactionDetail } from "~/server/contracts/transactionDetail";
@@ -134,9 +137,10 @@ export const groupRouter = createTRPCRouter({
           where: { slug: input.slug, deletedAt: null },
           include: {
             members: {
-              where: { status: "JOINED", deletedAt: null },
+              where: { status: { in: ["JOINED", "INVITED"] }, deletedAt: null },
               select: {
                 isAdmin: true,
+                status: true,
                 member: {
                   select: {
                     id: true,
@@ -242,6 +246,7 @@ export const groupRouter = createTRPCRouter({
         members: group.members.map((member) => ({
           ...member.member,
           isAdmin: member.isAdmin,
+          status: member.status,
         })),
         transactions: group.transactions.map((transaction) => ({
           id: transaction.id,
@@ -346,6 +351,43 @@ export const groupRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
       // Group membership is verified by middleware
 
+      // If assigning admin role, verify the inviter is an admin or creator
+      if (input.role === "admin") {
+        const { data: inviter, error: inviterError } = await withCatch(async () => {
+          return await ctx.db.groupMember.findFirst({
+            where: {
+              groupId: input.groupId,
+              memberId: ctx.userId,
+              status: "JOINED" as GroupMemberStatus,
+              deletedAt: null,
+            },
+            include: { group: { select: { createdById: true } } },
+          });
+        });
+
+        if (inviterError !== null) {
+          return {
+            data: null,
+            error: { message: "An error occurred.", code: "INTERNAL_SERVER_ERROR" },
+          };
+        }
+
+        if (!inviter) {
+          return {
+            data: null,
+            error: { message: "Only admins can assign the admin role.", code: "FORBIDDEN" },
+          };
+        }
+
+        const isGroupAdmin = inviter.isAdmin || inviter.group.createdById === ctx.userId;
+        if (!isGroupAdmin) {
+          return {
+            data: null,
+            error: { message: "Only admins can assign the admin role.", code: "FORBIDDEN" },
+          };
+        }
+      }
+
       const { data: isAlreadyJoined, error: isAlreadyJoinedError } = await isUserInGroupByStatus(
         ctx,
         input.groupId,
@@ -432,12 +474,65 @@ export const groupRouter = createTRPCRouter({
       }
 
       console.log("Inviting user to group:", input.inviteeUserId, "by", ctx.userId);
+
+      // Check for a previously soft-deleted invite and restore it
+      const { data: deletedInvite, error: deletedInviteError } = await withCatch(async () => {
+        return await ctx.db.groupMember.findFirst({
+          where: {
+            groupId: input.groupId,
+            memberId: input.inviteeUserId,
+            deletedAt: { not: null },
+          },
+        });
+      });
+
+      if (deletedInviteError !== null) {
+        console.error("Error checking for deleted invite:", deletedInviteError);
+        return {
+          data: null,
+          error: {
+            message: "An error occurred while inviting the user.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      if (deletedInvite) {
+        // Restore the soft-deleted record
+        const { error: restoreError } = await withCatch(async () => {
+          return await ctx.db.groupMember.update({
+            where: { id: deletedInvite.id },
+            data: {
+              deletedAt: null,
+              status: "INVITED",
+              invitedById: ctx.userId,
+              isAdmin: input.role === "admin",
+            },
+          });
+        });
+
+        if (restoreError !== null) {
+          console.error("Error restoring invite:", restoreError);
+          return {
+            data: null,
+            error: {
+              message: "An error occurred while inviting the user.",
+              code: "INTERNAL_SERVER_ERROR",
+            },
+          };
+        }
+
+        console.log("Restored previously deleted invite for user:", input.inviteeUserId);
+        return { data: "User invited successfully", error: null };
+      }
+
       const { error: inviteUserError } = await withCatch(async () => {
         return await ctx.db.groupMember.create({
           data: {
             groupId: input.groupId,
             invitedById: ctx.userId,
             memberId: input.inviteeUserId,
+            isAdmin: input.role === "admin",
             status: "INVITED",
           },
         });
@@ -456,6 +551,112 @@ export const groupRouter = createTRPCRouter({
       console.log("User invited to group successfully:", input.inviteeUserId);
 
       return { data: "User invited successfully", error: null };
+    }),
+
+  uninviteUser: groupAdminProcedure
+    .input(uninviteMemberSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      const groupId = input.groupId;
+      const targetUserId = input.userId;
+
+      // Find the invited member
+      const { data: invitedMember, error: findError } = await withCatch(async () => {
+        return await ctx.db.groupMember.findFirst({
+          where: {
+            groupId: groupId,
+            memberId: targetUserId,
+            status: "INVITED",
+            deletedAt: null,
+          },
+        });
+      });
+
+      if (findError !== null) {
+        return {
+          data: null,
+          error: { message: "An error occurred.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      if (!invitedMember) {
+        return {
+          data: null,
+          error: { message: "No pending invite found for this user.", code: "NOT_FOUND" },
+        };
+      }
+
+      // Soft delete the invite
+      const { error: deleteError } = await withCatch(async () => {
+        return await ctx.db.groupMember.update({
+          where: { id: invitedMember.id },
+          data: { deletedAt: new Date() },
+        });
+      });
+
+      if (deleteError !== null) {
+        return {
+          data: null,
+          error: {
+            message: "An error occurred while revoking the invite.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      return { data: "Invite revoked successfully", error: null };
+    }),
+
+  restoreInvite: groupAdminProcedure
+    .input(restoreInviteSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      const groupId = input.groupId;
+      const targetUserId = input.userId;
+
+      // Find the soft-deleted invite
+      const { data: deletedInvite, error: findError } = await withCatch(async () => {
+        return await ctx.db.groupMember.findFirst({
+          where: {
+            groupId: groupId,
+            memberId: targetUserId,
+            status: "INVITED",
+            deletedAt: { not: null },
+          },
+          orderBy: { deletedAt: "desc" },
+        });
+      });
+
+      if (findError !== null) {
+        return {
+          data: null,
+          error: { message: "An error occurred.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      if (!deletedInvite) {
+        return {
+          data: null,
+          error: { message: "No revoked invite found to restore.", code: "NOT_FOUND" },
+        };
+      }
+
+      const { error: restoreError } = await withCatch(async () => {
+        return await ctx.db.groupMember.update({
+          where: { id: deletedInvite.id },
+          data: { deletedAt: null },
+        });
+      });
+
+      if (restoreError !== null) {
+        return {
+          data: null,
+          error: {
+            message: "An error occurred while restoring the invite.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      return { data: "Invite restored successfully", error: null };
     }),
 
   acceptInvite: protectedProcedure
@@ -834,23 +1035,15 @@ async function verifyUsersAreGroupMembers(
 
   // Now check group membership for all existing users
   for (const userId of uniqueUserIds) {
-    const { data: isMember, error: memberError } = await isUserInGroupByStatus(
-      ctx,
-      groupId,
-      userId,
-      "JOINED",
-    );
-    if (memberError !== null) {
-      console.error("Error checking user group membership:", memberError);
-      return { data: null, error: memberError };
-    }
+    const { data: isJoined } = await isUserInGroupByStatus(ctx, groupId, userId, "JOINED");
+    const { data: isInvited } = await isUserInGroupByStatus(ctx, groupId, userId, "INVITED");
 
-    if (!isMember) {
-      console.warn("User is not a member of the group:", userId);
+    if (!isJoined && !isInvited) {
+      console.warn("User is not a member or invitee of the group:", userId);
       return {
         data: null,
         error: {
-          message: "All users (payer and recipients) must be members of the group",
+          message: "All users (payer and recipients) must be members or invitees of the group",
           code: "BAD_REQUEST",
         },
       };
