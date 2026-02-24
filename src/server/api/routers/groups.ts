@@ -3,7 +3,12 @@ import { z } from "zod";
 import { withCatch } from "~/lib/utils";
 import { createGroupSlug } from "~/lib/slugify";
 
-import { createTRPCRouter, protectedProcedure, type TRPCContext } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  groupMemberProcedure,
+  type TRPCContext,
+} from "~/server/api/trpc";
 import type { ApiResponse } from "~/server/contracts/apiResponse";
 import {
   createGroupSchema,
@@ -13,6 +18,8 @@ import {
   type GetGroupResponse,
 } from "~/server/contracts/groups";
 import type { CreateTransactionDetail } from "~/server/contracts/transactionDetail";
+import type { BalanceCalculationResult, UserBalance } from "~/server/contracts/balances";
+import { calculateGroupBalances } from "~/server/helpers/balanceCalculation";
 
 export const groupRouter = createTRPCRouter({
   createGroup: protectedProcedure
@@ -238,8 +245,9 @@ export const groupRouter = createTRPCRouter({
         })),
         transactions: group.transactions.map((transaction) => ({
           id: transaction.id,
-          amount: transaction.amount,
+          amount: transaction.amount.toNumber(),
           description: transaction.description,
+          transactionDate: transaction.transactionDate,
           createdAt: transaction.createdAt,
           updatedAt: transaction.updatedAt,
           createdById: transaction.createdById,
@@ -249,7 +257,7 @@ export const groupRouter = createTRPCRouter({
           transactionDetails: transaction.transactionDetails.map((detail) => ({
             id: detail.id,
             recipientId: detail.recipientId,
-            amount: detail.amount,
+            amount: detail.amount.toNumber(),
             createdAt: detail.createdAt,
             updatedAt: detail.updatedAt,
             recipient: detail.recipient,
@@ -333,30 +341,10 @@ export const groupRouter = createTRPCRouter({
       return { data: "Group deleted successfully", error: null };
     }),
 
-  inviteUser: protectedProcedure
+  inviteUser: groupMemberProcedure
     .input(inviteMemberSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
-      const { data: isMember, error: isMemberError } = await isUserInGroupByStatus(
-        ctx,
-        input.groupId,
-        ctx.userId,
-        "JOINED",
-      );
-      if (isMemberError !== null) {
-        console.error("Error checking group membership:", isMemberError);
-        return { data: null, error: isMemberError };
-      }
-
-      if (!isMember) {
-        console.warn("User is not a member of the group:", ctx.userId);
-        return {
-          data: null,
-          error: {
-            message: "You must be a member of the group to invite users",
-            code: "FORBIDDEN",
-          },
-        };
-      }
+      // Group membership is verified by middleware
 
       const { data: isAlreadyJoined, error: isAlreadyJoinedError } = await isUserInGroupByStatus(
         ctx,
@@ -548,30 +536,10 @@ export const groupRouter = createTRPCRouter({
       return { data: "Invite accepted successfully", error: null };
     }),
 
-  createTransaction: protectedProcedure
+  createTransaction: groupMemberProcedure
     .input(createTransactionSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
-      const { data: isMember, error: isMemberError } = await isUserInGroupByStatus(
-        ctx,
-        input.groupId,
-        ctx.userId,
-        "JOINED",
-      );
-      if (isMemberError !== null) {
-        console.error("Error checking group membership:", isMemberError);
-        return { data: null, error: isMemberError };
-      }
-
-      if (!isMember) {
-        console.warn("User is not a member of the group:", ctx.userId);
-        return {
-          data: null,
-          error: {
-            message: "You must be a member of the group to create transactions",
-            code: "FORBIDDEN",
-          },
-        };
-      }
+      // Group membership is verified by middleware
 
       if (!verifyTransactionDetails(input.amount, input.transactionDetails, input.payerId)) {
         return {
@@ -608,6 +576,7 @@ export const groupRouter = createTRPCRouter({
               groupId: input.groupId,
               amount: input.amount,
               description: input.description ?? null,
+              transactionDate: input.transactionDate,
               payerId: input.payerId,
               createdById: ctx.userId,
             },
@@ -650,6 +619,100 @@ export const groupRouter = createTRPCRouter({
 
       console.log("Transaction created successfully:", transaction.id);
       return { data: "Transaction created successfully", error: null };
+    }),
+
+  getDetailedBalances: groupMemberProcedure
+    .input(z.object({ groupId: z.number() }))
+    .query(async ({ ctx, input }): Promise<ApiResponse<BalanceCalculationResult>> => {
+      // Fetch all transactions for the group
+      const { data: transactions, error: transactionError } = await withCatch(async () => {
+        return await ctx.db.transaction.findMany({
+          where: {
+            groupId: input.groupId,
+            deletedAt: null,
+          },
+          include: {
+            transactionDetails: true,
+          },
+        });
+      });
+
+      if (transactionError !== null) {
+        console.error("Error fetching transactions:", transactionError);
+        return {
+          data: null,
+          error: {
+            message: "An error occurred while fetching transactions.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      // Transform transactions to match our helper function signature
+      const transformedTransactions = transactions.map((transaction) => ({
+        payerId: transaction.payerId,
+        amount: transaction.amount.toNumber(), // Convert Decimal to number
+        transactionDetails: transaction.transactionDetails.map((detail) => ({
+          recipientId: detail.recipientId,
+          amount: detail.amount.toNumber(), // Convert Decimal to number
+        })),
+      }));
+
+      // Calculate balances using helper method
+      const balanceData = calculateGroupBalances(transformedTransactions);
+
+      return {
+        data: balanceData,
+        error: null,
+      };
+    }),
+
+  getSimpleBalances: groupMemberProcedure
+    .input(z.object({ groupId: z.number() }))
+    .query(async ({ ctx, input }): Promise<ApiResponse<Record<string, UserBalance>>> => {
+      // Group membership is verified by middleware
+
+      // Fetch all transactions for the group
+      const { data: transactions, error: transactionError } = await withCatch(async () => {
+        return await ctx.db.transaction.findMany({
+          where: {
+            groupId: input.groupId,
+            deletedAt: null,
+          },
+          include: {
+            transactionDetails: true,
+          },
+        });
+      });
+
+      if (transactionError !== null) {
+        console.error("Error fetching transactions:", transactionError);
+        return {
+          data: null,
+          error: {
+            message: "An error occurred while fetching transactions.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      // Transform transactions to match our helper function signature
+      const transformedTransactions = transactions.map((transaction) => ({
+        payerId: transaction.payerId,
+        amount: transaction.amount.toNumber(), // Convert Decimal to number
+        transactionDetails: transaction.transactionDetails.map((detail) => ({
+          recipientId: detail.recipientId,
+          amount: detail.amount.toNumber(), // Convert Decimal to number
+        })),
+      }));
+
+      // Calculate balances using helper method and return just the user balances
+      const balanceData = calculateGroupBalances(transformedTransactions);
+
+      return {
+        data: balanceData.userBalances,
+        error: null,
+      };
     }),
 });
 

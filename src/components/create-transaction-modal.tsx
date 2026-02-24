@@ -5,6 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { Button } from "~/components/ui/button";
+import { Calendar } from "~/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -30,13 +32,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Plus, DollarSign, Users, Trash2 } from "lucide-react";
+import { Plus, DollarSign, Users, Trash2, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import type { GroupMember } from "~/server/contracts/groups";
 import { createTransactionFormSchema } from "~/server/contracts/groups";
 import { AnimatedButton } from "./ui/animated-button";
 
-type CreateTransactionForm = z.infer<typeof createTransactionFormSchema>;
+export type CreateTransactionForm = z.infer<typeof createTransactionFormSchema>;
 
 interface CreateTransactionModalProps {
   groupId: number;
@@ -54,12 +58,13 @@ export default function CreateTransactionModal({
   const [isTransactionSuccessful, setIsTransactionSuccessful] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  const form = useForm<CreateTransactionForm>({
+  const form = useForm({
     resolver: zodResolver(createTransactionFormSchema),
     defaultValues: {
       amount: "",
       description: "",
       payerId: "",
+      transactionDate: new Date(),
       splits: [{ recipientId: "", amount: "" }],
     },
   });
@@ -200,6 +205,7 @@ export default function CreateTransactionModal({
         amount: amountValue,
         description: values.description,
         payerId: values.payerId,
+        transactionDate: values.transactionDate as Date,
         transactionDetails: splitValues,
       });
 
@@ -305,6 +311,46 @@ export default function CreateTransactionModal({
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="transactionDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Transaction Date *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground",
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date > new Date()}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}

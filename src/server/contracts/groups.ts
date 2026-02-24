@@ -34,6 +34,7 @@ export const createTransactionSchema = z.object({
   amount: z.number(),
   payerId: z.string(),
   description: z.string().max(255).optional(),
+  transactionDate: z.coerce.date().default(() => new Date()), // Coerce and default to current date
   transactionDetails: z
     .array(createTransactionDetailSchema)
     .min(1, "At least one transaction detail is required"),
@@ -53,6 +54,7 @@ export const createTransactionFormSchema = z.object({
     ),
   description: z.string().max(255, "Description must be 255 characters or less").optional(),
   payerId: z.string().min(1, "Please select who paid"),
+  transactionDate: z.coerce.date().default(() => new Date()),
   splits: z
     .array(
       z.object({

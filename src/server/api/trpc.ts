@@ -12,6 +12,7 @@ import { ZodError } from "zod";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { db } from "~/server/db";
 import { withCatch } from "~/lib/utils";
+import type { GroupMemberStatus } from "@prisma/client";
 
 /**
  * 1. CONTEXT
@@ -183,8 +184,12 @@ const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
         data: {
           id: ctx.userId!,
           email: emailAddresses[0]!.emailAddress.toLowerCase(),
-          firstName: firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase() : "default",
-          lastName: lastName ? lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase() : "default",
+          firstName: firstName
+            ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+            : "default",
+          lastName: lastName
+            ? lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase()
+            : "default",
         },
       }),
   );
@@ -202,8 +207,61 @@ const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
   return next();
 });
 
+const requireGroupMembershipMiddleware = t.middleware(async ({ next, ctx, input }) => {
+  const inputWithGroupId = input as { groupId?: number };
+
+  if (!inputWithGroupId?.groupId) {
+    console.error(
+      "[TRPC] requireGroupMembershipMiddleware used on procedure without groupId in input",
+    );
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal error: groupId is required for this operation",
+    });
+  }
+
+  const { data: isMemberResponse, error: membershipError } = await withCatch(async () => {
+    return await ctx.db.groupMember.findFirst({
+      where: {
+        groupId: inputWithGroupId.groupId,
+        memberId: ctx.userId!,
+        status: "JOINED" as GroupMemberStatus,
+      },
+    });
+  });
+
+  if (membershipError !== null) {
+    console.error("[TRPC] Error checking group membership in middleware:", membershipError);
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "An error occurred while checking group membership.",
+    });
+  }
+
+  const isMember = isMemberResponse !== null;
+
+  if (!isMember) {
+    console.warn(
+      "[TRPC] User is not a member of the group:",
+      ctx.userId,
+      "groupId:",
+      inputWithGroupId.groupId,
+    );
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "You must be a member of this group to perform this action",
+    });
+  }
+
+  return next();
+});
+
 export const publicProcedure = t.procedure.use(timingMiddleware);
-export const protectedProcedure = t.procedure.use(timingMiddleware).use(authMiddleware).use(findOrCreateUserMiddleware);
+export const protectedProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(authMiddleware)
+  .use(findOrCreateUserMiddleware);
+export const groupMemberProcedure = protectedProcedure.use(requireGroupMembershipMiddleware);
 
 export type TRPCContext = Awaited<ReturnType<typeof createTRPCContext>>;
 

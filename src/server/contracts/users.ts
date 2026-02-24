@@ -1,10 +1,7 @@
 import type { User } from "@prisma/client";
 import { z } from "zod";
 
-export type SafeUser = Pick<
-  User,
-  "id" | "firstName" | "lastName" | "createdAt"
->;
+export type SafeUser = Pick<User, "id" | "firstName" | "lastName" | "createdAt">;
 
 export type GetUserGroupsResponse = {
   id: number;
@@ -13,6 +10,10 @@ export type GetUserGroupsResponse = {
   createdAt: Date;
   createdById: string;
   groupUsers: SafeUser[];
+  userBalance?: {
+    amount: number;
+    type: "receive" | "pay";
+  };
 };
 
 const firstName = z.string().min(1).max(50);

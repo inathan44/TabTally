@@ -71,18 +71,19 @@ model GroupMember {
 }
 
 model Transaction {
-  id          Int       @id @default(autoincrement())
-  createdById String
-  createdBy   User      @relation("TransactionCreator", fields: [createdById], references: [id])
-  payerId     String
-  payer       User      @relation("TransactionPayer", fields: [payerId], references: [id])
-  amount      Decimal   @db.Decimal(10, 2)
-  description String?   @db.VarChar(255)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
-  groupId     Int
-  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  id              Int       @id @default(autoincrement())
+  createdById     String
+  createdBy       User      @relation("TransactionCreator", fields: [createdById], references: [id])
+  payerId         String
+  payer           User      @relation("TransactionPayer", fields: [payerId], references: [id])
+  amount          Decimal   @db.Decimal(10, 2)
+  description     String?   @db.VarChar(255)
+  transactionDate DateTime  @default(now()) // When the expense actually occurred
+  createdAt       DateTime  @default(now()) // When recorded in system
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+  groupId         Int
+  group           Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   transactionDetails TransactionDetail[]
 
