@@ -173,9 +173,9 @@ export default function CreateGroupModal() {
       </DialogTrigger>
       <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-[600px]">
         {isRedirecting && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/80 backdrop-blur-sm">
-            <div className="flex items-center space-x-2 text-gray-600">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80 backdrop-blur-sm">
+            <div className="flex items-center space-x-2 text-muted-foreground">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-primary" />
               <span>Redirecting to your new group...</span>
             </div>
           </div>
@@ -192,8 +192,8 @@ export default function CreateGroupModal() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex h-full flex-col">
             <div className="flex-1 space-y-6 overflow-y-auto px-1 py-4">
               {createGroupError && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3">
-                  <div className="text-sm break-words text-red-600">
+                <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3">
+                  <div className="text-sm break-words text-destructive">
                     <strong>Error creating group:</strong> {createGroupError}
                   </div>
                 </div>
@@ -257,8 +257,8 @@ export default function CreateGroupModal() {
                 )}
 
                 {searchResultsError && (
-                  <div className="rounded-md border border-red-200 bg-red-50 p-3">
-                    <div className="text-sm text-red-600">
+                  <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3">
+                    <div className="text-sm text-destructive">
                       <strong>Search Error:</strong> {searchResultsError}
                     </div>
                   </div>
@@ -266,7 +266,7 @@ export default function CreateGroupModal() {
 
                 {isSearching && <div className="text-muted-foreground text-sm">Searching...</div>}
                 {searchResults?.error?.code === "NOT_FOUND" && showSearchResults && <div className="text-muted-foreground text-xs">No users found with that email</div>}
-                {searchResults?.error && searchResults.error.code !== "NOT_FOUND" && !searchResultsError && <div className="text-xs text-red-600">Error: {searchResults.error.message}</div>}
+                {searchResults?.error && searchResults.error.code !== "NOT_FOUND" && !searchResultsError && <div className="text-xs text-destructive">Error: {searchResults.error.message}</div>}
               </div>
 
               {invitedUsers && invitedUsers.length > 0 && (

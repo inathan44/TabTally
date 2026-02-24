@@ -205,7 +205,7 @@ export default function CreateTransactionModal({
         amount: amountValue,
         description: values.description,
         payerId: values.payerId,
-        transactionDate: values.transactionDate as Date,
+        transactionDate: values.transactionDate,
         transactionDetails: splitValues,
       });
 
@@ -332,11 +332,7 @@ export default function CreateTransactionModal({
                               !field.value && "text-muted-foreground",
                             )}
                           >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
