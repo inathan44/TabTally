@@ -155,7 +155,7 @@ const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
   const { emailAddresses, firstName, lastName, id } = await client.users.getUser(ctx.userId);
 
   const userInDatabase = await ctx.db.user.findUnique({
-    where: { id: ctx.userId },
+    where: { id: ctx.userId, deletedAt: null },
   });
 
   if (userInDatabase) {
@@ -207,8 +207,9 @@ const findOrCreateUserMiddleware = t.middleware(async ({ next, ctx }) => {
   return next();
 });
 
-const requireGroupMembershipMiddleware = t.middleware(async ({ next, ctx, input }) => {
-  const inputWithGroupId = input as { groupId?: number };
+const requireGroupMembershipMiddleware = t.middleware(async ({ next, ctx, getRawInput }) => {
+  const rawInput = await getRawInput();
+  const inputWithGroupId = rawInput as { groupId?: number };
 
   if (!inputWithGroupId?.groupId) {
     console.error(
@@ -226,6 +227,7 @@ const requireGroupMembershipMiddleware = t.middleware(async ({ next, ctx, input 
         groupId: inputWithGroupId.groupId,
         memberId: ctx.userId!,
         status: "JOINED" as GroupMemberStatus,
+        deletedAt: null,
       },
     });
   });

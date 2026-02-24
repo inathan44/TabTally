@@ -131,10 +131,10 @@ export const groupRouter = createTRPCRouter({
     .query(async ({ ctx, input }): Promise<ApiResponse<GetGroupResponse>> => {
       const { data: group, error: groupError } = await withCatch(async () => {
         return await ctx.db.group.findUnique({
-          where: { slug: input.slug },
+          where: { slug: input.slug, deletedAt: null },
           include: {
             members: {
-              where: { status: "JOINED" },
+              where: { status: "JOINED", deletedAt: null },
               select: {
                 isAdmin: true,
                 member: {
@@ -274,7 +274,7 @@ export const groupRouter = createTRPCRouter({
       // First, fetch and validate the group
       const { data: groupToDelete, error: fetchError } = await withCatch(async () => {
         return await ctx.db.group.findUnique({
-          where: { id: input.groupId },
+          where: { id: input.groupId, deletedAt: null },
         });
       });
 
@@ -463,7 +463,7 @@ export const groupRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
       const { data: existingInvite, error: existingInviteError } = await withCatch(async () => {
         return await ctx.db.groupMember.findUnique({
-          where: { id: input.groupMemberId },
+          where: { id: input.groupMemberId, deletedAt: null },
         });
       });
 
@@ -738,6 +738,7 @@ async function isUserInGroupByStatus(
         groupId: groupId,
         memberId: userId,
         status: status,
+        deletedAt: null,
       },
     });
   });

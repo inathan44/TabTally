@@ -13,7 +13,7 @@ export const userRouter = createTRPCRouter({
       const { data: user, error } = await withCatch(
         async () =>
           await ctx.db.user.findUnique({
-            where: { id: input },
+            where: { id: input, deletedAt: null },
           }),
       );
 
@@ -57,6 +57,7 @@ export const userRouter = createTRPCRouter({
         async () =>
           await ctx.db.group.findMany({
             where: {
+              deletedAt: null,
               members: { some: { memberId: ctx.userId, status: "JOINED" } },
             },
             select: {
@@ -68,6 +69,7 @@ export const userRouter = createTRPCRouter({
               members: {
                 where: {
                   status: "JOINED",
+                  deletedAt: null,
                 },
                 select: {
                   member: {
