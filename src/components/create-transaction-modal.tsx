@@ -45,18 +45,15 @@ export type CreateTransactionForm = z.infer<typeof createTransactionFormSchema>;
 interface CreateTransactionModalProps {
   groupId: number;
   groupMembers: GroupMember[];
-  onSuccess?: () => void;
 }
 
 export default function CreateTransactionModal({
   groupId,
   groupMembers,
-  onSuccess,
 }: CreateTransactionModalProps) {
+  const utils = api.useUtils();
   const [open, setOpen] = useState(false);
   const [transactionError, setTransactionError] = useState<string | null>(null);
-  const [isTransactionSuccessful, setIsTransactionSuccessful] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(createTransactionFormSchema),
@@ -212,19 +209,11 @@ export default function CreateTransactionModal({
       if (result.error) {
         setTransactionError(result.error.message);
       } else {
-        setIsTransactionSuccessful(true);
-        setTimeout(() => {
-          setIsRedirecting(true);
-          setTimeout(() => {
-            setOpen(false);
-            onSuccess?.();
-            // Reset form and states
-            form.reset();
-            setIsTransactionSuccessful(false);
-            setIsRedirecting(false);
-            setTransactionError(null);
-          }, 1000);
-        }, 1500);
+        setOpen(false);
+        void utils.group.getGroupBySlug.invalidate();
+        form.reset();
+        createTransactionMutation.reset();
+        setTransactionError(null);
       }
     } catch (error) {
       console.error("Transaction creation error:", error);
@@ -235,8 +224,7 @@ export default function CreateTransactionModal({
   const resetModal = () => {
     form.reset();
     setTransactionError(null);
-    setIsTransactionSuccessful(false);
-    setIsRedirecting(false);
+    createTransactionMutation.reset();
   };
 
   const totalSplitAmount = watchedSplits.reduce(
@@ -263,7 +251,6 @@ export default function CreateTransactionModal({
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        {isRedirecting && <div className="fixed inset-0 z-50 bg-black/50" />}
         <DialogHeader>
           <DialogTitle>Create New Transaction</DialogTitle>
           <DialogDescription>Add a new expense to split between group members</DialogDescription>
@@ -466,11 +453,13 @@ export default function CreateTransactionModal({
               {/* Amount validation display */}
               {amountValue > 0 && (
                 <div
-                  className={`rounded-lg p-3 text-sm ${
-                    Math.abs(amountDifference) < 0.01
-                      ? "border border-green-200 bg-green-50 text-green-700"
-                      : "border border-yellow-200 bg-yellow-50 text-yellow-700"
-                  }`}
+                  className={cn(
+                    "rounded-lg border p-3 text-sm",
+                    {
+                      "border-green-200 bg-green-50 text-green-700": Math.abs(amountDifference) < 0.01,
+                      "border-yellow-200 bg-yellow-50 text-yellow-700": Math.abs(amountDifference) >= 0.01,
+                    },
+                  )}
                 >
                   <div className="flex justify-between">
                     <span>Total Amount:</span>
@@ -483,7 +472,10 @@ export default function CreateTransactionModal({
                   {Math.abs(amountDifference) >= 0.01 && (
                     <div className="flex justify-between font-medium">
                       <span>Difference:</span>
-                      <span className={amountDifference > 0 ? "text-red-600" : "text-blue-600"}>
+                      <span className={cn({
+                        "text-red-600": amountDifference > 0,
+                        "text-blue-600": amountDifference <= 0,
+                      })}>
                         ${Math.abs(amountDifference).toFixed(2)}{" "}
                         {amountDifference > 0 ? "remaining" : "over"}
                       </span>
@@ -505,14 +497,14 @@ export default function CreateTransactionModal({
               <AnimatedButton
                 type="submit"
                 loading={createTransactionMutation.isPending}
-                success={isTransactionSuccessful}
+                success={createTransactionMutation.isSuccess && !createTransactionMutation.data?.error}
                 successText="Transaction Created!"
                 disabled={
-                  createTransactionMutation.isPending || isTransactionSuccessful || isRedirecting
+                  createTransactionMutation.isPending || createTransactionMutation.isSuccess
                 }
                 className="min-w-[140px]"
               >
-                {isRedirecting ? "Refreshing..." : "Create Transaction"}
+                Create Transaction
               </AnimatedButton>
             </div>
           </form>
