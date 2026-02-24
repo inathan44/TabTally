@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { Button } from "~/components/ui/button";
@@ -32,10 +32,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Plus, DollarSign, Users, Trash2, CalendarIcon } from "lucide-react";
+import { Plus, DollarSign, Users, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
+import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import type { GroupMember } from "~/server/contracts/groups";
 import { createTransactionFormSchema } from "~/server/contracts/groups";
 import { AnimatedButton } from "./ui/animated-button";
@@ -62,75 +63,54 @@ export default function CreateTransactionModal({
       description: "",
       payerId: "",
       transactionDate: new Date(),
-      splits: [{ recipientId: "", amount: "" }],
+      splits: [] as { recipientId: string; amount: string }[],
     },
   });
 
   const createTransactionMutation = api.group.createTransaction.useMutation();
 
+  const { fields, replace, append, remove } = useFieldArray({
+    control: form.control,
+    name: "splits",
+  });
+
   const watchedAmount = form.watch("amount");
   const watchedSplits = form.watch("splits");
+  const watchedPayerId = form.watch("payerId");
 
-  // Calculate split amounts automatically when amount changes (only if splits are empty)
+  const selectedMemberIds = new Set(fields.map((f) => f.recipientId));
+
+  // Auto-select payer in splits when payer changes
   useEffect(() => {
-    const amountValue = parseFloat(watchedAmount || "0");
-    if (amountValue > 0 && watchedSplits.length > 0) {
-      // Only auto-calculate if all splits are empty (haven't been manually set)
-      const allSplitsEmpty = watchedSplits.every(
-        (split) => !split.amount || split.amount === "0" || split.amount === "0.00",
-      );
-
-      if (allSplitsEmpty) {
-        // Convert to cents to avoid floating point issues
-        const totalCents = Math.round(amountValue * 100);
-        const splitCount = watchedSplits.length;
-
-        // Calculate base amount per person in cents
-        const baseCents = Math.floor(totalCents / splitCount);
-        const remainderCents = totalCents % splitCount;
-
-        const updatedSplits = watchedSplits.map((split, index) => {
-          // First 'remainderCents' people get an extra cent
-          const splitCents = baseCents + (index < remainderCents ? 1 : 0);
-          const splitAmount = (splitCents / 100).toFixed(2);
-
-          return {
-            ...split,
-            amount: splitAmount,
-          };
-        });
-
-        form.setValue("splits", updatedSplits);
-      }
-    }
-  }, [watchedAmount, watchedSplits.length, form]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const addSplit = () => {
+    if (!watchedPayerId) return;
     const currentSplits = form.getValues("splits");
-    const amount = form.getValues("amount");
-    const amountValue = parseFloat(amount || "0");
+    const alreadyIncluded = currentSplits.some((s) => s.recipientId === watchedPayerId);
+    if (!alreadyIncluded) {
+      append({ recipientId: watchedPayerId, amount: "" });
+    }
+  }, [watchedPayerId, form]);
 
-    // Calculate remaining amount for the new split
-    const currentTotal = currentSplits.reduce(
-      (sum, split) => sum + (parseFloat(split.amount) || 0),
-      0,
-    );
-    const remainingAmount = Math.max(0, amountValue - currentTotal);
-
-    const newSplit = {
-      recipientId: "",
-      amount: remainingAmount > 0 ? remainingAmount.toFixed(2) : "0.00",
-    };
-    form.setValue("splits", [...currentSplits, newSplit]);
+  const toggleMember = (memberId: string) => {
+    const currentSplits = form.getValues("splits");
+    if (selectedMemberIds.has(memberId)) {
+      const indexToRemove = currentSplits.findIndex((s) => s.recipientId === memberId);
+      if (indexToRemove !== -1) remove(indexToRemove);
+    } else {
+      append({ recipientId: memberId, amount: "" });
+    }
   };
 
-  const removeSplit = (index: number) => {
+  const selectAll = () => {
     const currentSplits = form.getValues("splits");
-    if (currentSplits.length > 1) {
-      form.setValue(
-        "splits",
-        currentSplits.filter((_, i) => i !== index),
-      );
+    const allSelected = groupMembers.every((m) => selectedMemberIds.has(m.id));
+    if (allSelected) {
+      replace([]);
+    } else {
+      const newSplits = groupMembers.map((member) => {
+        const existing = currentSplits.find((s) => s.recipientId === member.id);
+        return existing ?? { recipientId: member.id, amount: "" };
+      });
+      replace(newSplits);
     }
   };
 
@@ -139,61 +119,37 @@ export default function CreateTransactionModal({
     const splits = form.getValues("splits");
     const amountValue = parseFloat(amount || "0");
     if (amountValue > 0 && splits.length > 0) {
-      // Convert to cents to avoid floating point issues
       const totalCents = Math.round(amountValue * 100);
       const splitCount = splits.length;
-
-      // Calculate base amount per person in cents
       const baseCents = Math.floor(totalCents / splitCount);
       const remainderCents = totalCents % splitCount;
 
       const updatedSplits = splits.map((split, index) => {
-        // First 'remainderCents' people get an extra cent
         const splitCents = baseCents + (index < remainderCents ? 1 : 0);
-        const splitAmount = (splitCents / 100).toFixed(2);
-
-        return {
-          ...split,
-          amount: splitAmount,
-        };
+        return { ...split, amount: (splitCents / 100).toFixed(2) };
       });
 
-      form.setValue("splits", updatedSplits);
+      replace(updatedSplits);
     }
   };
+
+  const getMemberById = (id: string) => groupMembers.find((m) => m.id === id);
 
   const handleSubmit = async (values: CreateTransactionForm) => {
     try {
       setTransactionError(null);
 
-      // Parse string values to numbers
       const amountValue = parseFloat(values.amount);
       const splitValues = values.splits.map((split) => ({
         recipientId: split.recipientId,
         amount: parseFloat(split.amount),
       }));
 
-      // Validate that split amounts add up to total amount
       const totalSplitAmount = splitValues.reduce((sum, split) => sum + split.amount, 0);
       if (Math.abs(totalSplitAmount - amountValue) > 0.01) {
         setTransactionError(
           `Split amounts ($${totalSplitAmount.toFixed(2)}) must equal the total amount ($${amountValue.toFixed(2)})`,
         );
-        return;
-      }
-
-      // Validate that all recipients are selected
-      const unselectedRecipients = values.splits.some((split) => !split.recipientId);
-      if (unselectedRecipients) {
-        setTransactionError("Please select a recipient for each split");
-        return;
-      }
-
-      // Validate that no user is selected more than once
-      const selectedUserIds = values.splits.map((split) => split.recipientId);
-      const uniqueUserIds = new Set(selectedUserIds);
-      if (selectedUserIds.length !== uniqueUserIds.size) {
-        setTransactionError("Each user can only be selected once per transaction");
         return;
       }
 
@@ -233,6 +189,7 @@ export default function CreateTransactionModal({
   );
   const amountValue = parseFloat(watchedAmount || "0");
   const amountDifference = amountValue - totalSplitAmount;
+  const allSelected = groupMembers.length > 0 && groupMembers.every((m) => selectedMemberIds.has(m.id));
 
   return (
     <Dialog
@@ -258,7 +215,6 @@ export default function CreateTransactionModal({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            {/* Amount and Description */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
@@ -293,7 +249,6 @@ export default function CreateTransactionModal({
                         {groupMembers.map((member) => (
                           <SelectItem key={member.id} value={member.id}>
                             {member.firstName} {member.lastName}
-                            {member.isAdmin && " (Admin)"}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -316,7 +271,7 @@ export default function CreateTransactionModal({
                             variant="outline"
                             className={cn(
                               "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground",
+                              { "text-muted-foreground": !field.value },
                             )}
                           >
                             {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
@@ -363,95 +318,107 @@ export default function CreateTransactionModal({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  <span className="font-medium">Split Details</span>
+                  <span className="font-medium">Split Between</span>
                 </div>
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={equalSplit}>
-                    Equal Split
+                  <Button type="button" variant="outline" size="sm" onClick={selectAll}>
+                    {allSelected ? "Deselect All" : "Select All"}
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={addSplit}>
-                    <Plus className="mr-1 h-4 w-4" />
-                    Add Split
-                  </Button>
-                </div>
-              </div>
-
-              {watchedSplits.map((split, index) => (
-                <div key={index} className="flex items-end gap-2">
-                  <FormField
-                    control={form.control}
-                    name={`splits.${index}.recipientId`}
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel>Recipient {index + 1}</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select recipient" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {groupMembers
-                              .filter((member) => {
-                                // Filter out already selected users, except for the current selection
-                                const selectedUserIds = watchedSplits
-                                  .map((split, splitIndex) =>
-                                    splitIndex !== index ? split.recipientId : null,
-                                  )
-                                  .filter(Boolean);
-                                return !selectedUserIds.includes(member.id);
-                              })
-                              .map((member) => (
-                                <SelectItem key={member.id} value={member.id}>
-                                  {member.firstName} {member.lastName}
-                                  {member.isAdmin && " (Admin)"}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name={`splits.${index}.amount`}
-                    render={({ field }) => (
-                      <FormItem className="w-32">
-                        <FormLabel>Amount</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <DollarSign className="absolute top-1/2 left-2 h-3 w-3 -translate-y-1/2 transform text-gray-400" />
-                            <Input
-                              type="text"
-                              placeholder="0.00"
-                              className="pl-7 text-sm"
-                              {...field}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {watchedSplits.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeSplit(index)}
-                      className="mb-2 text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
+                  {fields.length > 0 && (
+                    <Button type="button" variant="outline" size="sm" onClick={equalSplit}>
+                      Split Evenly
                     </Button>
                   )}
                 </div>
-              ))}
+              </div>
+
+              {/* Member Chips */}
+              <div className="relative overflow-hidden">
+                <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {groupMembers.map((member) => {
+                    const isSelected = selectedMemberIds.has(member.id);
+                    return (
+                      <button
+                        key={member.id}
+                        type="button"
+                        onClick={() => toggleMember(member.id)}
+                        className={cn(
+                          "flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-all",
+                          {
+                            "border-primary bg-primary/10 text-primary": isSelected,
+                            "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground": !isSelected,
+                          },
+                        )}
+                      >
+                        <Avatar className="h-5 w-5">
+                          <AvatarFallback className="text-[9px]">
+                            {member.firstName.charAt(0)}
+                            {member.lastName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{member.firstName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Fade hint on right edge */}
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="splits"
+                render={() => (
+                  <FormItem>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Amount inputs for selected members */}
+              {fields.length > 0 && (
+                <div className="space-y-2">
+                  {fields.map((field, index) => {
+                    const member = getMemberById(field.recipientId);
+                    if (!member) return null;
+                    return (
+                      <div key={field.id} className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                        <Avatar className="h-7 w-7">
+                          <AvatarFallback className="bg-primary/8 text-[10px] font-medium text-primary">
+                            {member.firstName.charAt(0)}
+                            {member.lastName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                          {member.firstName} {member.lastName}
+                        </span>
+                        <FormField
+                          control={form.control}
+                          name={`splits.${index}.amount`}
+                          render={({ field: amountField }) => (
+                            <FormItem className="mb-0 w-28">
+                              <FormControl>
+                                <div className="relative">
+                                  <DollarSign className="absolute top-1/2 left-2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                                  <Input
+                                    type="text"
+                                    placeholder="0.00"
+                                    className="h-8 pl-6 text-sm"
+                                    {...amountField}
+                                  />
+                                </div>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Amount validation display */}
-              {amountValue > 0 && (
+              {amountValue > 0 && fields.length > 0 && (
                 <div
                   className={cn(
                     "rounded-lg border p-3 text-sm",
