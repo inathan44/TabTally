@@ -28,7 +28,13 @@ Starts a local Postgres instance in Docker:
 npm run db:push
 ```
 
-### 5. Start the dev server
+### 5. Seed test users (optional)
+
+```bash
+npm run db:seed
+```
+
+### 6. Start the dev server
 
 The frontend and backend both run in a single Next.js process (tRPC API routes are part of the Next.js app):
 
@@ -50,5 +56,6 @@ App will be available at [http://localhost:3000](http://localhost:3000).
 | `npm run db:generate` | Generate and run a migration |
 | `npm run db:studio` | Open Prisma Studio to browse the database |
 
+| `npm run db:seed` | Seed test users into the database |
 | `npm test` | Run tests |
 | `npm run check` | Lint + typecheck |
