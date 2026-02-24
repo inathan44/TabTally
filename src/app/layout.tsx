@@ -14,6 +14,7 @@ import {
   SignedOut,
 } from "@clerk/nextjs";
 import { Button } from "~/components/ui/button";
+import { Toaster } from "~/components/ui/sonner";
 import { Receipt } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -32,7 +33,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider>
-      <html lang="en" className={`${inter.variable}`}>
+      <html lang="en" className={inter.variable}>
         <body className="font-sans antialiased">
           <TRPCReactProvider>
             <div className="min-h-screen bg-background text-foreground">
@@ -71,6 +72,7 @@ export default function RootLayout({
               </SignedIn>
             </div>
           </TRPCReactProvider>
+          <Toaster />
         </body>
       </html>
     </ClerkProvider>
