@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignedIn, UserButton } from "@clerk/nextjs";
 import { useState } from "react";
-import { Menu } from "lucide-react";
+import { Menu, Receipt } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import { Separator } from "~/components/ui/separator";
 import {
   Sheet,
   SheetContent,
@@ -22,124 +23,101 @@ export default function Navbar() {
   const navItems = [
     { href: "/", label: "Home" },
     { href: "/groups", label: "Groups" },
-    { href: "/sandbox", label: "Sandbox" },
   ];
 
   const isActive = (href: string) => {
-    if (href === "/") {
-      return pathname === "/";
-    }
+    if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   };
 
-  const NavLink = ({ href, label, mobile = false }: { href: string; label: string; mobile?: boolean }) => {
-    if (mobile) {
-      return (
-        <Button
-          asChild
-          variant={isActive(href) ? "secondary" : "ghost"}
-          className="justify-start w-full text-left"
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          <Link href={href} className="truncate">
-            {label}
-          </Link>
-        </Button>
-      );
-    }
-
-    return (
-      <Link
-        href={href}
-        className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium transition-colors duration-200 whitespace-nowrap ${
-          isActive(href)
-            ? "border-blue-500 text-gray-900"
-            : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-        }`}
-      >
-        {label}
-      </Link>
-    );
-  };
-
   return (
-    <nav className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 min-w-0">
-        <div className="flex h-16 justify-between items-center">
-          {/* Logo and desktop nav */}
-          <div className="flex items-center min-w-0">
-            <div className="flex flex-shrink-0 items-center">
-              <Link href="/" className="text-xl font-bold text-gray-900 truncate">
+    <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+        <div className="flex h-14 items-center justify-between">
+          <div className="flex items-center gap-6">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                <Receipt className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <span className="text-sm font-semibold tracking-tight text-foreground">
                 TabTally
-              </Link>
-            </div>
-            
+              </span>
+            </Link>
+
+            <Separator orientation="vertical" className="hidden h-5 sm:block" />
+
             {/* Desktop Navigation */}
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <div className="hidden items-center gap-0.5 sm:flex">
               {navItems.map((item) => (
-                <NavLink key={item.href} href={item.href} label={item.label} />
+                <Button
+                  key={item.href}
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className={`h-8 px-3 text-[13px] font-medium ${
+                    isActive(item.href)
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Link href={item.href}>{item.label}</Link>
+                </Button>
               ))}
             </div>
           </div>
 
-          {/* Right side - Desktop user menu and mobile hamburger */}
-          <div className="flex items-center space-x-2 flex-shrink-0">
-            {/* Desktop User Menu */}
-            <div className="hidden sm:flex sm:items-center">
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:block">
               <SignedIn>
-                <UserButton afterSignOutUrl="/" />
+                <UserButton
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: { avatarBox: "h-7 w-7" },
+                  }}
+                />
               </SignedIn>
             </div>
 
             {/* Mobile Menu */}
-            <div className="flex items-center sm:hidden">
+            <div className="flex items-center gap-2 sm:hidden">
+              <SignedIn>
+                <UserButton
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: { avatarBox: "h-7 w-7" },
+                  }}
+                />
+              </SignedIn>
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="px-2 hover:bg-gray-100"
-                    aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
-                  >
-                    <Menu className="h-5 w-5" />
-                    <span className="sr-only">{isMobileMenuOpen ? "Close menu" : "Open menu"}</span>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Menu className="h-4 w-4" />
+                    <span className="sr-only">Menu</span>
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[280px] sm:w-[400px]">
+                <SheetContent side="right" className="w-[260px]">
                   <SheetHeader className="text-left">
-                    <SheetTitle>TabTally</SheetTitle>
-                    <SheetDescription>
-                      Navigate to different sections of the app
+                    <SheetTitle className="text-sm">Navigation</SheetTitle>
+                    <SheetDescription className="text-xs">
+                      Go to a section of the app.
                     </SheetDescription>
                   </SheetHeader>
-                  
-                  <div className="mt-8 flex flex-col space-y-2">
+                  <div className="mt-6 flex flex-col gap-0.5">
                     {navItems.map((item) => (
-                      <NavLink key={item.href} href={item.href} label={item.label} mobile />
+                      <Button
+                        key={item.href}
+                        asChild
+                        variant={isActive(item.href) ? "secondary" : "ghost"}
+                        size="sm"
+                        className="w-full justify-start text-[13px]"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <Link href={item.href}>{item.label}</Link>
+                      </Button>
                     ))}
-                  </div>
-
-                  {/* Mobile User Menu */}
-                  <div className="mt-8 border-t border-gray-200 pt-6">
-                    <SignedIn>
-                      <div className="flex items-center space-x-3 rounded-md bg-gray-50 p-3">
-                        <UserButton afterSignOutUrl="/" />
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-medium text-gray-900 truncate">Account</span>
-                          <span className="text-xs text-gray-500 truncate">Manage your profile</span>
-                        </div>
-                      </div>
-                    </SignedIn>
                   </div>
                 </SheetContent>
               </Sheet>
-              
-              {/* Mobile User Button - visible on mobile */}
-              <div className="flex-shrink-0">
-                <SignedIn>
-                  <UserButton afterSignOutUrl="/" />
-                </SignedIn>
-              </div>
             </div>
           </div>
         </div>
