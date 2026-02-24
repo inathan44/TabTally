@@ -15,6 +15,10 @@ interface MembersTabProps {
 }
 
 export default function MembersTab({ group, joinedCount, isGroupAdmin }: MembersTabProps) {
+  const getMemberBalance = (memberId: string) => {
+    return group.balances[memberId]?.netBalance ?? 0;
+  };
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -31,67 +35,77 @@ export default function MembersTab({ group, joinedCount, isGroupAdmin }: Members
               if (a.status === b.status) return 0;
               return a.status === "JOINED" ? -1 : 1;
             })
-            .map((member) => (
-              <div
-                key={member.id}
-                className={cn(
-                  "flex items-center justify-between rounded-lg px-3 py-3 transition-colors hover:bg-muted/40",
-                  member.status === "INVITED" && "opacity-60",
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarFallback
-                      className={cn(
-                        "text-xs font-medium",
-                        {
-                          "bg-muted text-muted-foreground": member.status === "INVITED",
-                          "bg-primary/8 text-primary": member.status !== "INVITED",
-                        },
-                      )}
-                    >
-                      {member.firstName.charAt(0)}
-                      {member.lastName.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-foreground text-sm font-medium">
-                      {member.firstName} {member.lastName}
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      {member.status === "INVITED"
-                        ? "Pending invite"
-                        : `Joined ${new Date(member.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
-                    </p>
+            .map((member) => {
+              const balance = getMemberBalance(member.id);
+              const isInvited = member.status === "INVITED";
+              return (
+                <div
+                  key={member.id}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg px-3 py-3 transition-colors hover:bg-muted/40",
+                    { "opacity-60": isInvited },
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback
+                        className={cn(
+                          "text-xs font-medium",
+                          {
+                            "bg-muted text-muted-foreground": isInvited,
+                            "bg-primary/8 text-primary": !isInvited,
+                          },
+                        )}
+                      >
+                        {member.firstName.charAt(0)}
+                        {member.lastName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-foreground text-sm font-medium">
+                        {member.firstName} {member.lastName}
+                      </p>
+                      <p className={cn("text-xs", {
+                        "text-green-600": balance > 0.01,
+                        "text-red-500": balance < -0.01,
+                        "text-muted-foreground": Math.abs(balance) <= 0.01,
+                      })}>
+                        {Math.abs(balance) <= 0.01
+                          ? isInvited ? "Pending invite" : "Settled up"
+                          : balance > 0
+                            ? `Owed $${balance.toFixed(2)}`
+                            : `Owes $${Math.abs(balance).toFixed(2)}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isInvited && (
+                      <GroupBadge
+                        icon={Clock}
+                        label="Invited"
+                        variant="outline"
+                        className="border-border text-muted-foreground text-[11px]"
+                      />
+                    )}
+                    {isInvited && isGroupAdmin && (
+                      <UninviteMemberDialog
+                        groupId={group.id}
+                        memberId={member.id}
+                        memberName={`${member.firstName} ${member.lastName}`}
+                      />
+                    )}
+                    {member.isAdmin && !isInvited && (
+                      <GroupBadge
+                        icon={Star}
+                        label={group.createdById === member.id ? "Creator" : "Admin"}
+                        variant="outline"
+                        className="border-warning/30 text-warning text-[11px] [&_svg]:fill-current"
+                      />
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {member.status === "INVITED" && (
-                    <GroupBadge
-                      icon={Clock}
-                      label="Invited"
-                      variant="outline"
-                      className="border-border text-muted-foreground text-[11px]"
-                    />
-                  )}
-                  {member.status === "INVITED" && isGroupAdmin && (
-                    <UninviteMemberDialog
-                      groupId={group.id}
-                      memberId={member.id}
-                      memberName={`${member.firstName} ${member.lastName}`}
-                    />
-                  )}
-                  {member.isAdmin && member.status === "JOINED" && (
-                    <GroupBadge
-                      icon={Star}
-                      label={group.createdById === member.id ? "Creator" : "Admin"}
-                      variant="outline"
-                      className="border-warning/30 text-warning text-[11px] [&_svg]:fill-current"
-                    />
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
       ) : (
         <div className="border-border rounded-xl border-2 border-dashed px-6 py-12 text-center">

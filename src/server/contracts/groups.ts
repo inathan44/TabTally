@@ -2,6 +2,7 @@ import type { Group, GroupMemberStatus } from "@prisma/client";
 import { z } from "zod";
 import type { SafeUser } from "./users";
 import type { SafeTransaction } from "./transactions";
+import type { UserBalance } from "./balances";
 import { createTransactionDetailSchema } from "./transactionDetail";
 
 const groupName = z.string().min(1).max(100);
@@ -95,6 +96,7 @@ export type GroupMember = SafeUser & {
 export type GetGroupResponse = SafeGroup & {
   members: GroupMember[];
   transactions: SafeTransaction[];
+  balances: Record<string, UserBalance>;
 };
 
 const invitedUsersFormSchema = z.array(

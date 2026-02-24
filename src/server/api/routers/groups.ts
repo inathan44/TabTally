@@ -236,6 +236,17 @@ export const groupRouter = createTRPCRouter({
 
       console.log("Group fetched successfully:", group.slug);
 
+      const balanceData = calculateGroupBalances(
+        group.transactions.map((t) => ({
+          payerId: t.payerId,
+          amount: t.amount.toNumber(),
+          transactionDetails: t.transactionDetails.map((d) => ({
+            recipientId: d.recipientId,
+            amount: d.amount.toNumber(),
+          })),
+        })),
+      );
+
       const groupResponse: GetGroupResponse = {
         id: group.id,
         name: group.name,
@@ -268,6 +279,7 @@ export const groupRouter = createTRPCRouter({
             recipient: detail.recipient,
           })),
         })),
+        balances: balanceData.userBalances,
       };
 
       return { data: groupResponse, error: null };
