@@ -189,7 +189,8 @@ export default function CreateTransactionModal({
   );
   const amountValue = parseFloat(watchedAmount || "0");
   const amountDifference = amountValue - totalSplitAmount;
-  const allSelected = groupMembers.length > 0 && groupMembers.every((m) => selectedMemberIds.has(m.id));
+  const allSelected =
+    groupMembers.length > 0 && groupMembers.every((m) => selectedMemberIds.has(m.id));
 
   return (
     <Dialog
@@ -202,19 +203,19 @@ export default function CreateTransactionModal({
       }}
     >
       <DialogTrigger asChild>
-        <Button className="bg-green-600 hover:bg-green-700">
+        <Button className="">
           <Plus className="mr-2 h-4 w-4" />
           Add Transaction
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>Create New Transaction</DialogTitle>
           <DialogDescription>Add a new expense to split between group members</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 overflow-y-auto">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
@@ -269,10 +270,9 @@ export default function CreateTransactionModal({
                         <FormControl>
                           <Button
                             variant="outline"
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              { "text-muted-foreground": !field.value },
-                            )}
+                            className={cn("w-full pl-3 text-left font-normal", {
+                              "text-muted-foreground": !field.value,
+                            })}
                           >
                             {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -333,7 +333,7 @@ export default function CreateTransactionModal({
               </div>
 
               {/* Member Chips */}
-              <div className="relative overflow-hidden">
+              <div className="relative min-w-0 overflow-hidden">
                 <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {groupMembers.map((member) => {
                     const isSelected = selectedMemberIds.has(member.id);
@@ -346,7 +346,8 @@ export default function CreateTransactionModal({
                           "flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-all",
                           {
                             "border-primary bg-primary/10 text-primary": isSelected,
-                            "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground": !isSelected,
+                            "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground":
+                              !isSelected,
                           },
                         )}
                       >
@@ -362,7 +363,7 @@ export default function CreateTransactionModal({
                   })}
                 </div>
                 {/* Fade hint on right edge */}
-                <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
+                <div className="from-background pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
               </div>
 
               <FormField
@@ -382,9 +383,12 @@ export default function CreateTransactionModal({
                     const member = getMemberById(field.recipientId);
                     if (!member) return null;
                     return (
-                      <div key={field.id} className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                      <div
+                        key={field.id}
+                        className="border-border bg-muted/30 flex items-center gap-3 rounded-lg border px-3 py-2"
+                      >
                         <Avatar className="h-7 w-7">
-                          <AvatarFallback className="bg-primary/8 text-[10px] font-medium text-primary">
+                          <AvatarFallback className="bg-primary/8 text-primary text-[10px] font-medium">
                             {member.firstName.charAt(0)}
                             {member.lastName.charAt(0)}
                           </AvatarFallback>
@@ -399,7 +403,7 @@ export default function CreateTransactionModal({
                             <FormItem className="mb-0 w-28">
                               <FormControl>
                                 <div className="relative">
-                                  <DollarSign className="absolute top-1/2 left-2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                                  <DollarSign className="text-muted-foreground absolute top-1/2 left-2 h-3 w-3 -translate-y-1/2" />
                                   <Input
                                     type="text"
                                     placeholder="0.00"
@@ -420,13 +424,12 @@ export default function CreateTransactionModal({
               {/* Amount validation display */}
               {amountValue > 0 && fields.length > 0 && (
                 <div
-                  className={cn(
-                    "rounded-lg border p-3 text-sm",
-                    {
-                      "border-green-200 bg-green-50 text-green-700": Math.abs(amountDifference) < 0.01,
-                      "border-yellow-200 bg-yellow-50 text-yellow-700": Math.abs(amountDifference) >= 0.01,
-                    },
-                  )}
+                  className={cn("rounded-lg border p-3 text-sm", {
+                    "border-green-200 bg-green-50 text-green-700":
+                      Math.abs(amountDifference) < 0.01,
+                    "border-yellow-200 bg-yellow-50 text-yellow-700":
+                      Math.abs(amountDifference) >= 0.01,
+                  })}
                 >
                   <div className="flex justify-between">
                     <span>Total Amount:</span>
@@ -439,10 +442,12 @@ export default function CreateTransactionModal({
                   {Math.abs(amountDifference) >= 0.01 && (
                     <div className="flex justify-between font-medium">
                       <span>Difference:</span>
-                      <span className={cn({
-                        "text-red-600": amountDifference > 0,
-                        "text-blue-600": amountDifference <= 0,
-                      })}>
+                      <span
+                        className={cn({
+                          "text-red-600": amountDifference > 0,
+                          "text-blue-600": amountDifference <= 0,
+                        })}
+                      >
                         ${Math.abs(amountDifference).toFixed(2)}{" "}
                         {amountDifference > 0 ? "remaining" : "over"}
                       </span>
@@ -464,7 +469,9 @@ export default function CreateTransactionModal({
               <AnimatedButton
                 type="submit"
                 loading={createTransactionMutation.isPending}
-                success={createTransactionMutation.isSuccess && !createTransactionMutation.data?.error}
+                success={
+                  createTransactionMutation.isSuccess && !createTransactionMutation.data?.error
+                }
                 successText="Transaction Created!"
                 disabled={
                   createTransactionMutation.isPending || createTransactionMutation.isSuccess
