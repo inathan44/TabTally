@@ -247,6 +247,26 @@ export const groupRouter = createTRPCRouter({
         })),
       );
 
+      const memberIds = new Set(group.members.map((m) => m.member.id));
+      const formerMemberIds = Object.entries(balanceData.userBalances)
+        .filter(
+          ([userId, balance]) => !memberIds.has(userId) && Math.abs(balance.netBalance) > 0.01,
+        )
+        .map(([userId]) => userId);
+
+      let formerMembers: GetGroupResponse["members"] = [];
+      if (formerMemberIds.length > 0) {
+        const { data: users } = await withCatch(async () => {
+          return await ctx.db.user.findMany({
+            where: { id: { in: formerMemberIds } },
+            select: { id: true, firstName: true, lastName: true, createdAt: true },
+          });
+        });
+        if (users) {
+          formerMembers = users.map((u) => ({ ...u, isAdmin: false, status: "LEFT" as const }));
+        }
+      }
+
       const groupResponse: GetGroupResponse = {
         id: group.id,
         name: group.name,
@@ -254,15 +274,19 @@ export const groupRouter = createTRPCRouter({
         description: group.description,
         createdAt: group.createdAt,
         createdById: group.createdById,
-        members: group.members.map((member) => ({
-          ...member.member,
-          isAdmin: member.isAdmin,
-          status: member.status,
-        })),
+        members: [
+          ...group.members.map((member) => ({
+            ...member.member,
+            isAdmin: member.isAdmin,
+            status: member.status,
+          })),
+          ...formerMembers,
+        ],
         transactions: group.transactions.map((transaction) => ({
           id: transaction.id,
           amount: transaction.amount.toNumber(),
           description: transaction.description,
+          isSettlement: transaction.isSettlement,
           transactionDate: transaction.transactionDate,
           createdAt: transaction.createdAt,
           updatedAt: transaction.updatedAt,
@@ -280,6 +304,7 @@ export const groupRouter = createTRPCRouter({
           })),
         })),
         balances: balanceData.userBalances,
+        settlements: balanceData.settlementPlan,
       };
 
       return { data: groupResponse, error: null };
@@ -753,8 +778,40 @@ export const groupRouter = createTRPCRouter({
     .input(createTransactionSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
       // Group membership is verified by middleware
+      const isSettlement = input.isSettlement ?? false;
 
-      if (!verifyTransactionDetails(input.amount, input.transactionDetails, input.payerId)) {
+      // Settlement-specific validation
+      if (isSettlement) {
+        if (input.transactionDetails.length !== 1) {
+          return {
+            data: null,
+            error: { message: "Settlements must have exactly one recipient.", code: "BAD_REQUEST" },
+          };
+        }
+        if (input.payerId === input.transactionDetails[0]!.recipientId) {
+          return {
+            data: null,
+            error: { message: "Cannot settle up with yourself.", code: "BAD_REQUEST" },
+          };
+        }
+        // Only the payer or recipient can record a settlement
+        const recipientId = input.transactionDetails[0]!.recipientId;
+        if (ctx.userId !== input.payerId && ctx.userId !== recipientId) {
+          return {
+            data: null,
+            error: {
+              message: "Only the payer or recipient can record this settlement.",
+              code: "FORBIDDEN",
+            },
+          };
+        }
+      }
+
+      // Regular transactions require amounts to add up
+      if (
+        !isSettlement &&
+        !verifyTransactionDetails(input.amount, input.transactionDetails, input.payerId)
+      ) {
         return {
           data: null,
           error: {
@@ -779,6 +836,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       // Create the transaction and transaction details in a database transaction
+      // Settlements are stored with negative amounts (payback, not expense)
+      const storedAmount = isSettlement ? -input.amount : input.amount;
+
       const { data: transaction, error: transactionError } = await withCatch(async () => {
         return await ctx.db.$transaction(async (tx) => {
           console.log("Creating transaction for group:", input.groupId, "by user:", ctx.userId);
@@ -787,11 +847,12 @@ export const groupRouter = createTRPCRouter({
           const newTransaction = await tx.transaction.create({
             data: {
               groupId: input.groupId,
-              amount: input.amount,
-              description: input.description ?? null,
+              amount: storedAmount,
+              description: isSettlement ? "Settlement" : (input.description ?? null),
               transactionDate: input.transactionDate,
               payerId: input.payerId,
               createdById: ctx.userId,
+              isSettlement,
             },
           });
 
@@ -805,7 +866,7 @@ export const groupRouter = createTRPCRouter({
                   transactionId: newTransaction.id,
                   recipientId: detail.recipientId,
                   groupId: input.groupId,
-                  amount: detail.amount,
+                  amount: isSettlement ? -detail.amount : detail.amount,
                 },
               });
             }),

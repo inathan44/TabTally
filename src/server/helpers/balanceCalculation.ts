@@ -34,11 +34,11 @@ export function calculateGroupBalances(
     };
   });
 
-  // Calculate totals for each user
+  // Calculate totals for each user (use absolute values since settlements are stored negative)
   transactions.forEach((transaction) => {
-    userBalances[transaction.payerId]!.totalPaid += transaction.amount;
+    userBalances[transaction.payerId]!.totalPaid += Math.abs(transaction.amount);
     transaction.transactionDetails.forEach((detail) => {
-      userBalances[detail.recipientId]!.totalOwed += detail.amount;
+      userBalances[detail.recipientId]!.totalOwed += Math.abs(detail.amount);
     });
   });
 

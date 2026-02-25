@@ -8,6 +8,7 @@ import { useGroupPermissions } from "~/hooks/use-group-permissions";
 import ConfettiEffect from "~/components/ConfettiEffect";
 import TransactionsTab from "~/components/group-transactions-tab";
 import MembersTab from "~/components/group-members-tab";
+import BalancesTab from "~/components/group-balances-tab";
 import { GroupBadge } from "~/components/group-badges";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -19,7 +20,7 @@ interface GroupInfoProps {
   groupSlug: string;
 }
 
-const VALID_TABS = ["transactions", "members"] as const;
+const VALID_TABS = ["transactions", "balances", "members"] as const;
 type TabValue = (typeof VALID_TABS)[number];
 
 export default function GroupInfo({ groupSlug }: GroupInfoProps) {
@@ -106,7 +107,9 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
     );
   }
 
-  const totalSpending = group.transactions?.reduce((sum, t) => sum + Number(t.amount), 0) ?? 0;
+  const totalSpending = group.transactions
+    ?.filter((t) => !t.isSettlement)
+    .reduce((sum, t) => sum + Number(t.amount), 0) ?? 0;
   const joinedCount = group.members.filter((m) => m.status === "JOINED").length;
   const invitedCount = group.members.filter((m) => m.status === "INVITED").length;
   const transactionCount = group.transactions?.length ?? 0;
@@ -177,6 +180,12 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
               Transactions
             </TabsTrigger>
             <TabsTrigger
+              value="balances"
+              className="h-8 rounded-md px-4 text-xs font-medium data-[state=active]:shadow-sm"
+            >
+              Balances
+            </TabsTrigger>
+            <TabsTrigger
               value="members"
               className="h-8 rounded-md px-4 text-xs font-medium data-[state=active]:shadow-sm"
             >
@@ -186,6 +195,10 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
 
           <TabsContent value="transactions" className="mt-6">
             <TransactionsTab group={group} totalSpending={totalSpending} />
+          </TabsContent>
+
+          <TabsContent value="balances" className="mt-6">
+            <BalancesTab group={group} />
           </TabsContent>
 
           <TabsContent value="members" className="mt-6">

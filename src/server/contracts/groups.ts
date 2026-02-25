@@ -2,7 +2,7 @@ import type { Group, GroupMemberStatus } from "@prisma/client";
 import { z } from "zod";
 import type { SafeUser } from "./users";
 import type { SafeTransaction } from "./transactions";
-import type { UserBalance } from "./balances";
+import type { UserBalance, Settlement } from "./balances";
 import { createTransactionDetailSchema } from "./transactionDetail";
 
 const groupName = z.string().min(1).max(100);
@@ -43,10 +43,11 @@ export const restoreInviteSchema = z.object({
 
 export const createTransactionSchema = z.object({
   groupId: groupId,
-  amount: z.number(),
+  amount: z.number().positive("Amount must be greater than 0"),
   payerId: z.string(),
   description: z.string().max(255).optional(),
-  transactionDate: z.coerce.date().default(() => new Date()), // Coerce and default to current date
+  transactionDate: z.coerce.date().default(() => new Date()),
+  isSettlement: z.boolean().default(false).optional(),
   transactionDetails: z
     .array(createTransactionDetailSchema)
     .min(1, "At least one transaction detail is required"),
@@ -90,13 +91,14 @@ type SafeGroup = Pick<Group, "id" | "name" | "slug" | "createdAt" | "createdById
 
 export type GroupMember = SafeUser & {
   isAdmin: boolean;
-  status: GroupMemberStatus;
+  status: GroupMemberStatus | "LEFT";
 };
 
 export type GetGroupResponse = SafeGroup & {
   members: GroupMember[];
   transactions: SafeTransaction[];
   balances: Record<string, UserBalance>;
+  settlements: Settlement[];
 };
 
 const invitedUsersFormSchema = z.array(

@@ -78,8 +78,9 @@ model Transaction {
   payer           User      @relation("TransactionPayer", fields: [payerId], references: [id])
   amount          Decimal   @db.Decimal(10, 2)
   description     String?   @db.VarChar(255)
-  transactionDate DateTime  @default(now()) // When the expense actually occurred
-  createdAt       DateTime  @default(now()) // When recorded in system
+  isSettlement    Boolean   @default(false)
+  transactionDate DateTime  @default(now())
+  createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
   groupId         Int

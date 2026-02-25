@@ -5,6 +5,7 @@ import CreateTransactionModal from "~/components/create-transaction-modal";
 import { Card, CardContent } from "~/components/ui/card";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import type { GetGroupResponse } from "~/server/contracts/groups";
+import { cn } from "~/lib/utils";
 
 interface TransactionsTabProps {
   group: GetGroupResponse;
@@ -48,23 +49,34 @@ export default function TransactionsTab({
             .map((transaction) => (
               <Card
                 key={transaction.id}
-                className="gap-0 py-0 transition-colors hover:bg-muted/30"
+                className="gap-0 py-0"
               >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-primary/8 text-[11px] font-medium text-primary">
+                        <AvatarFallback className={cn(
+                          "text-[11px] font-medium",
+                          {
+                            "bg-green-500/8 text-green-600": transaction.isSettlement,
+                            "bg-primary/8 text-primary": !transaction.isSettlement,
+                          },
+                        )}>
                           {transaction.payer.firstName.charAt(0)}
                           {transaction.payer.lastName.charAt(0)}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          {transaction.description ?? "Untitled expense"}
+                          {transaction.isSettlement
+                            ? `${transaction.payer.firstName} settled up`
+                            : (transaction.description ?? "Untitled expense")}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {transaction.payer.firstName} paid ·{" "}
+                          {transaction.isSettlement
+                            ? `Paid ${transaction.transactionDetails?.[0]?.recipient.firstName ?? "someone"}`
+                            : `${transaction.payer.firstName} paid`}
+                          {" · "}
                           {new Date(transaction.createdAt).toLocaleDateString(
                             "en-US",
                             { month: "short", day: "numeric" },
@@ -72,12 +84,18 @@ export default function TransactionsTab({
                         </p>
                       </div>
                     </div>
-                    <span className="text-sm font-semibold text-foreground">
-                      ${Number(transaction.amount).toFixed(2)}
+                    <span className={cn(
+                      "text-sm font-semibold",
+                      {
+                        "text-green-600": transaction.isSettlement,
+                        "text-foreground": !transaction.isSettlement,
+                      },
+                    )}>
+                      ${Math.abs(Number(transaction.amount)).toFixed(2)}
                     </span>
                   </div>
 
-                  {transaction.transactionDetails?.length > 0 && (
+                  {!transaction.isSettlement && transaction.transactionDetails?.length > 0 && (
                     <div className="ml-11 mt-3 space-y-1.5 border-t border-border pt-3">
                       {transaction.transactionDetails.map((detail) => (
                         <div
