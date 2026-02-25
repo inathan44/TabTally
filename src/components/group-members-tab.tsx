@@ -32,18 +32,20 @@ export default function MembersTab({ group, joinedCount, isGroupAdmin }: Members
         <div className="space-y-1">
           {group.members
             .sort((a, b) => {
-              if (a.status === b.status) return 0;
-              return a.status === "JOINED" ? -1 : 1;
+              const order: Record<string, number> = { JOINED: 0, INVITED: 1, LEFT: 2, BANNED: 3 };
+              return (order[a.status] ?? 3) - (order[b.status] ?? 3);
             })
             .map((member) => {
               const balance = getMemberBalance(member.id);
               const isInvited = member.status === "INVITED";
+              const isLeft = member.status === "LEFT";
+              const isDimmed = isInvited || isLeft;
               return (
                 <div
                   key={member.id}
                   className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-3 transition-colors hover:bg-muted/40",
-                    { "opacity-60": isInvited },
+                    "flex items-center justify-between rounded-lg px-3 py-3",
+                    { "opacity-60": isDimmed },
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -52,8 +54,8 @@ export default function MembersTab({ group, joinedCount, isGroupAdmin }: Members
                         className={cn(
                           "text-xs font-medium",
                           {
-                            "bg-muted text-muted-foreground": isInvited,
-                            "bg-primary/8 text-primary": !isInvited,
+                            "bg-muted text-muted-foreground": isDimmed,
+                            "bg-primary/8 text-primary": !isDimmed,
                           },
                         )}
                       >
@@ -71,7 +73,7 @@ export default function MembersTab({ group, joinedCount, isGroupAdmin }: Members
                         "text-muted-foreground": Math.abs(balance) <= 0.01,
                       })}>
                         {Math.abs(balance) <= 0.01
-                          ? isInvited ? "Pending invite" : "Settled up"
+                          ? isInvited ? "Pending invite" : isLeft ? "No longer a member" : "Settled up"
                           : balance > 0
                             ? `Owed $${balance.toFixed(2)}`
                             : `Owes $${Math.abs(balance).toFixed(2)}`}
@@ -79,6 +81,14 @@ export default function MembersTab({ group, joinedCount, isGroupAdmin }: Members
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {isLeft && (
+                      <GroupBadge
+                        icon={Clock}
+                        label="Left"
+                        variant="outline"
+                        className="border-border text-muted-foreground text-[11px]"
+                      />
+                    )}
                     {isInvited && (
                       <GroupBadge
                         icon={Clock}
@@ -94,7 +104,7 @@ export default function MembersTab({ group, joinedCount, isGroupAdmin }: Members
                         memberName={`${member.firstName} ${member.lastName}`}
                       />
                     )}
-                    {member.isAdmin && !isInvited && (
+                    {member.isAdmin && !isDimmed && (
                       <GroupBadge
                         icon={Star}
                         label={group.createdById === member.id ? "Creator" : "Admin"}

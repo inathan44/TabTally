@@ -94,7 +94,7 @@ export default function InviteMemberModal({ groupId, existingMembers, canAssignR
               form={form}
               fieldName="invitedUsers"
               canAssignRoles={canAssignRoles}
-              isDisabled={(user) => existingMembers.some((m) => m.id === user.id)}
+              isDisabled={(user) => existingMembers.some((m) => m.id === user.id && m.status !== "LEFT")}
               disabledLabel={(user) => {
                 const member = existingMembers.find((m) => m.id === user.id);
                 return member?.status === "INVITED" ? "Already invited" : "Already a member";
