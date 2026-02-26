@@ -20,6 +20,9 @@ import {
   restoreTransactionSchema,
   createSettlementSchema,
   deleteGroupSchema,
+  updateGroupSchema,
+  updateMemberRoleSchema,
+  restoreGroupSchema,
   inviteMemberSchema,
   uninviteMemberSchema,
   restoreInviteSchema,
@@ -388,6 +391,160 @@ export const groupRouter = createTRPCRouter({
       console.log("Group deleted successfully:", data.id);
 
       return { data: "Group deleted successfully", error: null };
+    }),
+
+  restoreGroup: protectedProcedure
+    .input(restoreGroupSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      const { data: group, error: fetchError } = await withCatch(async () => {
+        return await ctx.db.group.findFirst({
+          where: { id: input.groupId, deletedAt: { not: null } },
+        });
+      });
+
+      if (fetchError !== null) {
+        console.error("Error fetching group for restore:", fetchError);
+        return {
+          data: null,
+          error: { message: "An error occurred while fetching the group.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      if (!group) {
+        return {
+          data: null,
+          error: { message: "No deleted group found to restore.", code: "NOT_FOUND" },
+        };
+      }
+
+      if (group.createdById !== ctx.userId) {
+        return {
+          data: null,
+          error: { message: "Only the group creator can restore a deleted group.", code: "FORBIDDEN" },
+        };
+      }
+
+      const { error: restoreError } = await withCatch(async () => {
+        return await ctx.db.group.update({
+          where: { id: input.groupId },
+          data: { deletedAt: null },
+        });
+      });
+
+      if (restoreError !== null) {
+        console.error("Error restoring group:", restoreError);
+        return {
+          data: null,
+          error: { message: "An error occurred while restoring the group.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      return { data: "Group restored successfully", error: null };
+    }),
+
+  updateGroup: groupAdminProcedure
+    .input(updateGroupSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      const { error: updateError } = await withCatch(async () => {
+        return await ctx.db.group.update({
+          where: { id: input.groupId, deletedAt: null },
+          data: {
+            name: input.name,
+            description: input.description ?? null,
+          },
+        });
+      });
+
+      if (updateError !== null) {
+        console.error("Error updating group:", updateError);
+        return {
+          data: null,
+          error: { message: "An error occurred while updating the group.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      return { data: "Group updated successfully", error: null };
+    }),
+
+  updateMemberRole: groupAdminProcedure
+    .input(updateMemberRoleSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      // Cannot change your own role
+      if (input.memberId === ctx.userId) {
+        return {
+          data: null,
+          error: { message: "You cannot change your own role.", code: "BAD_REQUEST" },
+        };
+      }
+
+      // Cannot demote the group creator
+      const { data: group, error: groupError } = await withCatch(async () => {
+        return await ctx.db.group.findUnique({ where: { id: input.groupId } });
+      });
+
+      if (groupError !== null || !group) {
+        return {
+          data: null,
+          error: { message: "Group not found.", code: "NOT_FOUND" },
+        };
+      }
+
+      if (input.memberId === group.createdById && !input.isAdmin) {
+        return {
+          data: null,
+          error: { message: "The group owner cannot be demoted.", code: "FORBIDDEN" },
+        };
+      }
+
+      const { data: member, error: fetchError } = await withCatch(async () => {
+        return await ctx.db.groupMember.findUnique({
+          where: {
+            groupId_memberId: { groupId: input.groupId, memberId: input.memberId },
+          },
+        });
+      });
+
+      if (fetchError !== null) {
+        console.error("Error fetching member:", fetchError);
+        return {
+          data: null,
+          error: { message: "An error occurred while fetching the member.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      if (!member || member.deletedAt !== null) {
+        return {
+          data: null,
+          error: { message: "Member not found in this group.", code: "NOT_FOUND" },
+        };
+      }
+
+      if (member.status !== "JOINED") {
+        return {
+          data: null,
+          error: { message: "Can only change roles for joined members.", code: "BAD_REQUEST" },
+        };
+      }
+
+      const { error: updateError } = await withCatch(async () => {
+        return await ctx.db.groupMember.update({
+          where: { id: member.id },
+          data: { isAdmin: input.isAdmin },
+        });
+      });
+
+      if (updateError !== null) {
+        console.error("Error updating member role:", updateError);
+        return {
+          data: null,
+          error: { message: "An error occurred while updating the member role.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      return {
+        data: `Member ${input.isAdmin ? "promoted to admin" : "demoted to member"} successfully`,
+        error: null,
+      };
     }),
 
   inviteUser: groupMemberProcedure

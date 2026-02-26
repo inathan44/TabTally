@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { ArrowLeft, Users, Receipt, Clock } from "lucide-react";
+import { ArrowLeft, Users, Receipt, Clock, Settings } from "lucide-react";
 import Link from "next/link";
 import { useGroupPermissions } from "~/hooks/use-group-permissions";
 import ConfettiEffect from "~/components/ConfettiEffect";
@@ -166,6 +166,13 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
               </div>
             </div>
           </div>
+          {isGroupAdmin && (
+            <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+              <Link href={`/groups/${groupSlug}/settings`}>
+                <Settings className="h-4 w-4" />
+              </Link>
+            </Button>
+          )}
         </div>
 
         <Separator className="my-8" />

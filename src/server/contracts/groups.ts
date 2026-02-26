@@ -53,6 +53,22 @@ export const deleteGroupSchema = z.object({
   hard: z.boolean().default(false).optional(),
 });
 
+export const updateGroupSchema = z.object({
+  groupId: groupId,
+  name: groupName,
+  description: groupDescription,
+});
+
+export const updateMemberRoleSchema = z.object({
+  groupId: groupId,
+  memberId: z.string().min(1),
+  isAdmin: z.boolean(),
+});
+
+export const restoreGroupSchema = z.object({
+  groupId: groupId,
+});
+
 export const inviteMemberSchema = z.object({
   groupId: groupId,
   inviteeUserId: z.string(),
