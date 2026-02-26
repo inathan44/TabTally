@@ -208,14 +208,14 @@ export default function CreateTransactionModal({
           Add Transaction
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Create New Transaction</DialogTitle>
           <DialogDescription>Add a new expense to split between group members</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 overflow-y-auto">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="min-h-0 flex-1 space-y-6 overflow-y-auto">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
