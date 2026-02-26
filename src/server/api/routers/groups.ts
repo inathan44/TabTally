@@ -2,6 +2,7 @@ import type { GroupMemberStatus } from "@prisma/client";
 import { z } from "zod";
 import { withCatch } from "~/lib/utils";
 import { createGroupSlug } from "~/lib/slugify";
+import { storageService, type UploadResult } from "~/server/services/storage";
 
 import {
   createTRPCRouter,
@@ -290,6 +291,8 @@ export const groupRouter = createTRPCRouter({
           id: transaction.id,
           amount: transaction.amount.toNumber(),
           description: transaction.description,
+          category: transaction.category,
+          receiptUrl: transaction.receiptUrl,
           isSettlement: transaction.isSettlement,
           transactionDate: transaction.transactionDate,
           createdAt: transaction.createdAt,
@@ -812,6 +815,8 @@ export const groupRouter = createTRPCRouter({
               groupId: input.groupId,
               amount: input.amount,
               description: input.description ?? null,
+              category: input.category ?? null,
+              receiptUrl: input.receiptUrl ?? null,
               transactionDate: input.transactionDate,
               payerId: input.payerId,
               createdById: ctx.userId,
@@ -982,6 +987,8 @@ export const groupRouter = createTRPCRouter({
             data: {
               amount: input.amount,
               description: input.description ?? null,
+              category: input.category ?? null,
+              receiptUrl: input.receiptUrl ?? null,
               transactionDate: input.transactionDate,
               payerId: input.payerId,
             },
@@ -1105,6 +1112,35 @@ export const groupRouter = createTRPCRouter({
       }
 
       return { data: "Transaction restored successfully", error: null };
+    }),
+
+  uploadReceipt: groupMemberProcedure
+    .input(
+      z.object({
+        groupId: z.number().int().positive(),
+        fileName: z.string().min(1).max(255),
+        mimeType: z.enum([
+          "image/jpeg",
+          "image/png",
+          "image/heic",
+          "application/pdf",
+        ]),
+      }),
+    )
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<UploadResult>> => {
+      const { data: result, error: uploadError } = await withCatch(async () => {
+        return await storageService.getUploadUrl(input.fileName, input.mimeType);
+      });
+
+      if (uploadError !== null) {
+        console.error("Error getting upload URL:", uploadError);
+        return {
+          data: null,
+          error: { message: "Failed to prepare receipt upload.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      return { data: result, error: null };
     }),
 
   getDetailedBalances: groupMemberProcedure
@@ -1267,7 +1303,7 @@ function verifyTransactionDetails(
   }
 
   const totalAmount = transactionDetails.reduce((sum, detail) => sum + detail.amount, 0);
-  if (totalAmount !== transactionAmount) {
+  if (Math.abs(totalAmount - transactionAmount) > 0.01) {
     console.error("Total amount of transaction details does not match transaction amount");
     return false;
   }

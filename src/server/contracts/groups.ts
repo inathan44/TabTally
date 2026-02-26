@@ -1,4 +1,4 @@
-import type { Group, GroupMemberStatus } from "@prisma/client";
+import type { Group, GroupMemberStatus, TransactionCategory } from "@prisma/client";
 import { z } from "zod";
 import type { SafeUser } from "./users";
 import type { SafeTransaction } from "./transactions";
@@ -8,6 +8,34 @@ import { createTransactionDetailSchema } from "./transactionDetail";
 const groupName = z.string().min(1).max(100);
 const groupDescription = z.string().max(255).optional();
 const groupId = z.number().int().positive();
+
+export const transactionCategories = [
+  "FOOD",
+  "HOUSING",
+  "TRANSPORTATION",
+  "ENTERTAINMENT",
+  "UTILITIES",
+  "SHOPPING",
+  "HEALTH",
+  "EDUCATION",
+  "TRAVEL",
+  "OTHER",
+] as const;
+
+export const transactionCategoryLabels: Record<TransactionCategory, string> = {
+  FOOD: "Food",
+  HOUSING: "Housing",
+  TRANSPORTATION: "Transportation",
+  ENTERTAINMENT: "Entertainment",
+  UTILITIES: "Utilities",
+  SHOPPING: "Shopping",
+  HEALTH: "Health",
+  EDUCATION: "Education",
+  TRAVEL: "Travel",
+  OTHER: "Other",
+};
+
+const categorySchema = z.enum(transactionCategories).optional().nullable();
 
 export const invitedUserSchema = z.object({
   userId: z.string(),
@@ -56,6 +84,8 @@ export const createTransactionSchema = z.object({
   amount: z.number().positive("Amount must be greater than 0"),
   payerId: z.string(),
   description: z.string().max(255).optional(),
+  category: categorySchema,
+  receiptUrl: z.string().max(500).optional().nullable(),
   transactionDate: z.coerce.date().default(() => new Date()),
   transactionDetails: z
     .array(createTransactionDetailSchema)
@@ -85,7 +115,8 @@ export const createTransactionFormSchema = z.object({
       },
       { message: "Amount must be a valid number greater than 0" },
     ),
-  description: z.string().max(255, "Description must be 255 characters or less").optional(),
+  description: z.string().max(255, "Description must be 255 characters or less").default(""),
+  category: categorySchema.default(null),
   payerId: z.string().min(1, "Please select who paid"),
   transactionDate: z.coerce.date().default(() => new Date()),
   splits: z

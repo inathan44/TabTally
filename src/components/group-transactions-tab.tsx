@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { DollarSign, Pencil, Receipt } from "lucide-react";
+import { DollarSign, Receipt } from "lucide-react";
 import CreateTransactionModal from "~/components/create-transaction-modal";
-import DeleteTransactionDialog from "~/components/delete-transaction-dialog";
-import { Button } from "~/components/ui/button";
+import TransactionDetailSheet from "~/components/transaction-detail-sheet";
 import { Card, CardContent } from "~/components/ui/card";
-import { Avatar, AvatarFallback } from "~/components/ui/avatar";
+import { Badge } from "~/components/ui/badge";
 import type { GetGroupResponse } from "~/server/contracts/groups";
+import { transactionCategoryLabels } from "~/server/contracts/groups";
 import type { SafeTransaction } from "~/server/contracts/transactions";
+import type { TransactionCategory } from "@prisma/client";
 import { cn } from "~/lib/utils";
 
 interface TransactionsTabProps {
@@ -24,10 +25,29 @@ export default function TransactionsTab({
   isGroupAdmin,
   userId,
 }: TransactionsTabProps) {
+  const [selectedTransaction, setSelectedTransaction] = useState<SafeTransaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<SafeTransaction | null>(null);
 
   const canEdit = (transaction: SafeTransaction) =>
     isGroupAdmin || transaction.createdById === userId;
+
+  const getUserShare = (transaction: SafeTransaction): { label: string; className: string } | null => {
+    if (!userId || transaction.isSettlement) return null;
+
+    const userSplit = transaction.transactionDetails.find((d) => d.recipientId === userId);
+    const isPayer = transaction.payerId === userId;
+
+    if (isPayer && userSplit) {
+      const owedBack = Math.abs(Number(transaction.amount)) - Number(userSplit.amount);
+      if (owedBack > 0) {
+        return { label: `You are owed $${owedBack.toFixed(2)}`, className: "text-green-600" };
+      }
+    } else if (userSplit) {
+      return { label: `You owe $${Number(userSplit.amount).toFixed(2)}`, className: "text-orange-600" };
+    }
+
+    return null;
+  };
 
   return (
     <div>
@@ -59,99 +79,58 @@ export default function TransactionsTab({
                 new Date(b.createdAt).getTime() -
                 new Date(a.createdAt).getTime(),
             )
-            .map((transaction) => (
-              <Card
-                key={transaction.id}
-                className="gap-0 py-0"
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className={cn(
-                          "text-[11px] font-medium",
-                          {
-                            "bg-green-500/8 text-green-600": transaction.isSettlement,
-                            "bg-primary/8 text-primary": !transaction.isSettlement,
-                          },
-                        )}>
-                          {transaction.payer.firstName.charAt(0)}
-                          {transaction.payer.lastName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {transaction.isSettlement
-                            ? `${transaction.payer.firstName} settled up`
-                            : (transaction.description ?? "Untitled expense")}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {transaction.isSettlement
-                            ? `Paid ${transaction.transactionDetails?.[0]?.recipient.firstName ?? "someone"}`
-                            : `${transaction.payer.firstName} paid`}
-                          {" · "}
-                          {new Date(transaction.createdAt).toLocaleDateString(
-                            "en-US",
-                            { month: "short", day: "numeric" },
+            .map((transaction) => {
+              const share = getUserShare(transaction);
+
+              return (
+                <Card
+                  key={transaction.id}
+                  className="cursor-pointer gap-0 py-0 transition-colors hover:bg-muted/50"
+                  onClick={() => setSelectedTransaction(transaction)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {transaction.isSettlement
+                              ? `${transaction.payer.firstName} → ${transaction.transactionDetails?.[0]?.recipient.firstName ?? "?"}`
+                              : (transaction.description ?? "Untitled expense")}
+                          </p>
+                          {transaction.category && (
+                            <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                              {transactionCategoryLabels[transaction.category as TransactionCategory]}
+                            </Badge>
                           )}
+                          {transaction.receiptUrl && (
+                            <Receipt className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {transaction.isSettlement ? "Settlement" : `${transaction.payer.firstName} paid`}
+                          {" · "}
+                          {new Date(transaction.transactionDate).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "text-sm font-semibold",
-                        {
+                      <div className="ml-4 text-right">
+                        <p className={cn("text-sm font-semibold", {
                           "text-green-600": transaction.isSettlement,
                           "text-foreground": !transaction.isSettlement,
-                        },
-                      )}>
-                        ${Math.abs(Number(transaction.amount)).toFixed(2)}
-                      </span>
-                      {canEdit(transaction) && !transaction.isSettlement && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                          onClick={() => setEditingTransaction(transaction)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      {canEdit(transaction) && (
-                        <DeleteTransactionDialog
-                          groupId={group.id}
-                          transactionId={transaction.id}
-                          transactionDescription={
-                            transaction.isSettlement
-                              ? `${transaction.payer.firstName} settled up`
-                              : (transaction.description ?? "Untitled expense")
-                          }
-                        />
-                      )}
+                        })}>
+                          ${Math.abs(Number(transaction.amount)).toFixed(2)}
+                        </p>
+                        {share && (
+                          <p className={cn("text-xs", share.className)}>{share.label}</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-
-                  {!transaction.isSettlement && transaction.transactionDetails?.length > 0 && (
-                    <div className="ml-11 mt-3 space-y-1.5 border-t border-border pt-3">
-                      {transaction.transactionDetails.map((detail) => (
-                        <div
-                          key={detail.id}
-                          className="flex items-center justify-between"
-                        >
-                          <span className="text-xs text-muted-foreground">
-                            {detail.recipient.firstName}{" "}
-                            {detail.recipient.lastName}
-                          </span>
-                          <span className="text-xs font-medium text-foreground">
-                            ${Number(detail.amount).toFixed(2)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
         </div>
       ) : (
         <div className="rounded-xl border-2 border-dashed border-border px-6 py-12 text-center">
@@ -164,6 +143,21 @@ export default function TransactionsTab({
           </p>
         </div>
       )}
+
+      <TransactionDetailSheet
+        transaction={selectedTransaction}
+        open={!!selectedTransaction}
+        onOpenChange={(open) => { if (!open) setSelectedTransaction(null); }}
+        groupId={group.id}
+        userId={userId}
+        canEdit={selectedTransaction ? canEdit(selectedTransaction) : false}
+        onEdit={() => {
+          if (selectedTransaction) {
+            setEditingTransaction(selectedTransaction);
+            setSelectedTransaction(null);
+          }
+        }}
+      />
 
       {editingTransaction && (
         <CreateTransactionModal

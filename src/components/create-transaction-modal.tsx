@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
+import type { TransactionCategory } from "@prisma/client";
 import { Button } from "~/components/ui/button";
 import { Calendar } from "~/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
@@ -32,15 +33,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Plus, DollarSign, Users, CalendarIcon } from "lucide-react";
+import { Plus, DollarSign, Users, CalendarIcon, Upload, X, FileText, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import type { GroupMember } from "~/server/contracts/groups";
-import { createTransactionFormSchema } from "~/server/contracts/groups";
+import { createTransactionFormSchema, transactionCategories, transactionCategoryLabels } from "~/server/contracts/groups";
 import type { SafeTransaction } from "~/server/contracts/transactions";
 import { AnimatedButton } from "./ui/animated-button";
+import { useReceiptUpload } from "~/hooks/use-receipt-upload";
 
 export type CreateTransactionForm = z.infer<typeof createTransactionFormSchema>;
 
@@ -64,6 +66,10 @@ export default function CreateTransactionModal({
   const [internalOpen, setInternalOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [transactionError, setTransactionError] = useState<string | null>(null);
+  const receipt = useReceiptUpload({
+    groupId,
+    initialUrl: isEditMode ? (editTransaction.receiptUrl ?? null) : null,
+  });
 
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -73,6 +79,7 @@ export default function CreateTransactionModal({
     ? {
         amount: Math.abs(Number(editTransaction.amount)).toFixed(2),
         description: editTransaction.description ?? "",
+        category: editTransaction.category ?? null,
         payerId: editTransaction.payerId,
         transactionDate: new Date(editTransaction.transactionDate),
         splits: editTransaction.transactionDetails.map((d) => ({
@@ -83,6 +90,7 @@ export default function CreateTransactionModal({
     : {
         amount: "",
         description: "",
+        category: null as typeof transactionCategories[number] | null,
         payerId: "",
         transactionDate: new Date(),
         splits: [] as { recipientId: string; amount: string }[],
@@ -185,6 +193,8 @@ export default function CreateTransactionModal({
         groupId,
         amount: amountValue,
         description: values.description,
+        category: values.category,
+        receiptUrl: receipt.url,
         payerId: values.payerId,
         transactionDate: values.transactionDate,
         transactionDetails: splitValues,
@@ -215,6 +225,7 @@ export default function CreateTransactionModal({
   const resetModal = () => {
     form.reset(defaultValues);
     setTransactionError(null);
+    receipt.reset();
     activeMutation.reset();
   };
 
@@ -354,6 +365,88 @@ export default function CreateTransactionModal({
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select
+                      onValueChange={(val) => field.onChange(val === "none" ? null : val)}
+                      value={field.value ?? "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">No category</SelectItem>
+                        {transactionCategories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {transactionCategoryLabels[cat as TransactionCategory]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="space-y-2">
+                <FormLabel>Receipt</FormLabel>
+                <input
+                  ref={receipt.fileInputRef}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.heic,.pdf"
+                  onChange={(e) => {
+                    receipt.handleFileChange(e).catch((err: Error) => {
+                      setTransactionError(err.message);
+                    });
+                  }}
+                  className="hidden"
+                />
+                {receipt.error && (
+                  <p className="text-xs text-destructive">{receipt.error}</p>
+                )}
+                {receipt.url ? (
+                  <div className="flex items-center gap-2 rounded-md border border-border p-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {receipt.file?.name ?? "Receipt attached"}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={receipt.removeReceipt}
+                      disabled={receipt.isPending}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ) : receipt.isPending ? (
+                  <div className="flex items-center gap-2 rounded-md border border-border p-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Uploading...</span>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => receipt.fileInputRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Receipt
+                  </Button>
+                )}
+              </div>
+            </div>
 
             {/* Split Section */}
             <div className="space-y-4">
@@ -516,7 +609,7 @@ export default function CreateTransactionModal({
                 }
                 successText={isEditMode ? "Transaction Updated!" : "Transaction Created!"}
                 disabled={
-                  activeMutation.isPending || activeMutation.isSuccess
+                  activeMutation.isPending || (activeMutation.isSuccess && !activeMutation.data?.error)
                 }
                 className="min-w-[140px]"
               >
