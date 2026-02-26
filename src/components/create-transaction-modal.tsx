@@ -212,6 +212,7 @@ export default function CreateTransactionModal({
       } else {
         setOpen(false);
         void utils.group.getGroupBySlug.invalidate();
+        void utils.group.getGroupTransactions.invalidate();
         form.reset();
         activeMutation.reset();
         setTransactionError(null);

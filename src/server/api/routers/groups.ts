@@ -1,4 +1,4 @@
-import type { GroupMemberStatus } from "@prisma/client";
+import type { GroupMemberStatus, Prisma, TransactionCategory } from "@prisma/client";
 import { z } from "zod";
 import { withCatch } from "~/lib/utils";
 import { createGroupSlug } from "~/lib/slugify";
@@ -23,12 +23,16 @@ import {
   updateGroupSchema,
   updateMemberRoleSchema,
   restoreGroupSchema,
+  getGroupTransactionsSchema,
+  transactionCategories,
+  transactionCategoryLabels,
   inviteMemberSchema,
   uninviteMemberSchema,
   restoreInviteSchema,
   type GetGroupResponse,
 } from "~/server/contracts/groups";
 import type { CreateTransactionDetail } from "~/server/contracts/transactionDetail";
+import type { SafeTransaction } from "~/server/contracts/transactions";
 import type { BalanceCalculationResult, UserBalance } from "~/server/contracts/balances";
 import { calculateGroupBalances } from "~/server/helpers/balanceCalculation";
 
@@ -318,6 +322,119 @@ export const groupRouter = createTRPCRouter({
       };
 
       return { data: groupResponse, error: null };
+    }),
+
+  getGroupTransactions: groupMemberProcedure
+    .input(getGroupTransactionsSchema)
+    .query(async ({ ctx, input }): Promise<ApiResponse<SafeTransaction[]>> => {
+      const where: Prisma.TransactionWhereInput = {
+        groupId: input.groupId,
+        deletedAt: null,
+      };
+
+      if (input.search) {
+        const term = input.search;
+        where.OR = [
+          { description: { contains: term, mode: "insensitive" } },
+          { payer: { firstName: { contains: term, mode: "insensitive" } } },
+          { payer: { lastName: { contains: term, mode: "insensitive" } } },
+          { transactionDetails: { some: { recipient: { firstName: { contains: term, mode: "insensitive" } } } } },
+          { transactionDetails: { some: { recipient: { lastName: { contains: term, mode: "insensitive" } } } } },
+          // Match category by checking if the search term matches any category enum value
+          ...transactionCategories
+            .filter((cat) => transactionCategoryLabels[cat].toLowerCase().includes(term.toLowerCase()))
+            .map((cat) => ({ category: cat as TransactionCategory })),
+        ];
+      }
+
+      if (input.categories && input.categories.length > 0) {
+        where.category = { in: input.categories };
+      }
+
+      if (input.payerIds && input.payerIds.length > 0) {
+        where.payerId = { in: input.payerIds };
+      }
+
+      if (input.dateFrom || input.dateTo) {
+        where.transactionDate = {};
+        if (input.dateFrom) where.transactionDate.gte = input.dateFrom;
+        if (input.dateTo) {
+          const endOfDay = new Date(input.dateTo);
+          endOfDay.setHours(23, 59, 59, 999);
+          where.transactionDate.lte = endOfDay;
+        }
+      }
+
+      const { data: transactions, error: fetchError } = await withCatch(async () => {
+        return await ctx.db.transaction.findMany({
+          where,
+          orderBy: { transactionDate: "desc" },
+          include: {
+            transactionDetails: {
+              include: {
+                recipient: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    createdAt: true,
+                  },
+                },
+              },
+            },
+            createdBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                createdAt: true,
+              },
+            },
+            payer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                createdAt: true,
+              },
+            },
+          },
+        });
+      });
+
+      if (fetchError !== null) {
+        console.error("Error fetching transactions:", fetchError);
+        return {
+          data: null,
+          error: { message: "An error occurred while fetching transactions.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      const mapped: SafeTransaction[] = transactions.map((transaction) => ({
+        id: transaction.id,
+        amount: transaction.amount.toNumber(),
+        description: transaction.description,
+        category: transaction.category,
+        receiptUrl: transaction.receiptUrl,
+        isSettlement: transaction.isSettlement,
+        transactionDate: transaction.transactionDate,
+        createdAt: transaction.createdAt,
+        updatedAt: transaction.updatedAt,
+        createdById: transaction.createdById,
+        payerId: transaction.payerId,
+        createdBy: transaction.createdBy,
+        payer: transaction.payer,
+        transactionDetails: transaction.transactionDetails.map((detail) => ({
+          id: detail.id,
+          recipientId: detail.recipientId,
+          amount: detail.amount.toNumber(),
+          createdAt: detail.createdAt,
+          updatedAt: detail.updatedAt,
+          recipient: detail.recipient,
+        })),
+      }));
+
+      return { data: mapped, error: null };
     }),
 
   deleteGroup: protectedProcedure

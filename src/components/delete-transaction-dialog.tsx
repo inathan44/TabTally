@@ -39,6 +39,7 @@ export default function DeleteTransactionDialog({
       .then((result) => {
         if (result.error) throw new Error(result.error.message);
         void utils.group.getGroupBySlug.invalidate();
+        void utils.group.getGroupTransactions.invalidate();
         return `"${transactionDescription}" restored`;
       });
 
@@ -59,6 +60,7 @@ export default function DeleteTransactionDialog({
       }
 
       void utils.group.getGroupBySlug.invalidate();
+      void utils.group.getGroupTransactions.invalidate();
       setOpen(false);
       toast(`"${transactionDescription}" deleted`, {
         action: {

@@ -93,6 +93,7 @@ export default function SettleUpModal({
       form.reset();
       settleMutation.reset();
       void utils.group.getGroupBySlug.invalidate();
+      void utils.group.getGroupTransactions.invalidate();
     }
   };
 

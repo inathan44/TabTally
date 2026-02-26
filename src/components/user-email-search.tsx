@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
+import { useDebounce } from "~/hooks/use-debounce";
 
 export interface SearchedUser {
   id: string;
@@ -40,7 +41,7 @@ export default function InviteUserPicker<T extends FieldValues>({
   placeholder = "Search users by email",
 }: InviteUserPickerProps<T>) {
   const [searchEmail, setSearchEmail] = useState("");
-  const [debouncedEmail, setDebouncedEmail] = useState("");
+  const debouncedEmail = useDebounce(searchEmail);
   const [showResults, setShowResults] = useState(false);
 
   const invitedUsers = (form.watch(fieldName) ?? []) as InvitedUser[];
@@ -51,7 +52,6 @@ export default function InviteUserPicker<T extends FieldValues>({
   const handleAdd = (user: SearchedUser) => {
     setValues([...getValues(), { user: { ...user, email: debouncedEmail }, role: "user" }]);
     setSearchEmail("");
-    setDebouncedEmail("");
     setShowResults(false);
   };
 
@@ -71,13 +71,6 @@ export default function InviteUserPicker<T extends FieldValues>({
     { email: debouncedEmail },
     { enabled: false, retry: false },
   );
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedEmail(searchEmail);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchEmail]);
 
   useEffect(() => {
     if (debouncedEmail.trim()) {
