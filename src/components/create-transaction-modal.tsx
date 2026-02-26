@@ -54,6 +54,7 @@ export default function CreateTransactionModal({
 }: CreateTransactionModalProps) {
   const utils = api.useUtils();
   const [open, setOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [transactionError, setTransactionError] = useState<string | null>(null);
 
   const form = useForm({
@@ -265,7 +266,7 @@ export default function CreateTransactionModal({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Transaction Date *</FormLabel>
-                    <Popover>
+                    <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
@@ -283,7 +284,10 @@ export default function CreateTransactionModal({
                         <Calendar
                           mode="single"
                           selected={field.value}
-                          onSelect={field.onChange}
+                          onSelect={(date) => {
+                            field.onChange(date);
+                            setDatePickerOpen(false);
+                          }}
                           disabled={(date) => date > new Date()}
                           initialFocus
                         />
