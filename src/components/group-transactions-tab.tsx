@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DollarSign, Pencil, Receipt } from "lucide-react";
 import CreateTransactionModal from "~/components/create-transaction-modal";
+import DeleteTransactionDialog from "~/components/delete-transaction-dialog";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
@@ -115,6 +116,17 @@ export default function TransactionsTab({
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
+                      )}
+                      {canEdit(transaction) && (
+                        <DeleteTransactionDialog
+                          groupId={group.id}
+                          transactionId={transaction.id}
+                          transactionDescription={
+                            transaction.isSettlement
+                              ? `${transaction.payer.firstName} settled up`
+                              : (transaction.description ?? "Untitled expense")
+                          }
+                        />
                       )}
                     </div>
                   </div>

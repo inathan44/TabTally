@@ -15,6 +15,8 @@ import {
   createGroupSchema,
   createTransactionSchema,
   updateTransactionSchema,
+  deleteTransactionSchema,
+  restoreTransactionSchema,
   createSettlementSchema,
   deleteGroupSchema,
   inviteMemberSchema,
@@ -922,7 +924,15 @@ export const groupRouter = createTRPCRouter({
         });
       });
 
-      if (fetchError !== null || !existingTransaction) {
+      if (fetchError !== null) {
+        console.error("Error fetching transaction:", fetchError);
+        return {
+          data: null,
+          error: { message: "An error occurred while fetching the transaction.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      if (!existingTransaction) {
         return {
           data: null,
           error: { message: "Transaction not found.", code: "NOT_FOUND" },
@@ -1001,6 +1011,100 @@ export const groupRouter = createTRPCRouter({
       }
 
       return { data: "Transaction updated successfully", error: null };
+    }),
+
+  deleteTransaction: groupMemberProcedure
+    .input(deleteTransactionSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      const { data: transaction, error: fetchError } = await withCatch(async () => {
+        return await ctx.db.transaction.findFirst({
+          where: { id: input.transactionId, groupId: input.groupId, deletedAt: null },
+        });
+      });
+
+      if (fetchError !== null) {
+        console.error("Error fetching transaction:", fetchError);
+        return {
+          data: null,
+          error: { message: "An error occurred while fetching the transaction.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      if (!transaction) {
+        return {
+          data: null,
+          error: { message: "Transaction not found.", code: "NOT_FOUND" },
+        };
+      }
+
+      const { error: permError } = canModifyRecord(ctx.userId, transaction.createdById, ctx.isGroupAdmin);
+      if (permError) {
+        return { data: null, error: permError };
+      }
+
+      const { error: deleteError } = await withCatch(async () => {
+        return await ctx.db.transaction.update({
+          where: { id: input.transactionId },
+          data: { deletedAt: new Date() },
+        });
+      });
+
+      if (deleteError !== null) {
+        console.error("Error deleting transaction:", deleteError);
+        return {
+          data: null,
+          error: { message: "An error occurred while deleting the transaction.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      return { data: "Transaction deleted successfully", error: null };
+    }),
+
+  restoreTransaction: groupMemberProcedure
+    .input(restoreTransactionSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      const { data: transaction, error: fetchError } = await withCatch(async () => {
+        return await ctx.db.transaction.findFirst({
+          where: { id: input.transactionId, groupId: input.groupId, deletedAt: { not: null } },
+        });
+      });
+
+      if (fetchError !== null) {
+        console.error("Error fetching transaction:", fetchError);
+        return {
+          data: null,
+          error: { message: "An error occurred while fetching the transaction.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      if (!transaction) {
+        return {
+          data: null,
+          error: { message: "No deleted transaction found to restore.", code: "NOT_FOUND" },
+        };
+      }
+
+      const { error: permError } = canModifyRecord(ctx.userId, transaction.createdById, ctx.isGroupAdmin);
+      if (permError) {
+        return { data: null, error: permError };
+      }
+
+      const { error: restoreError } = await withCatch(async () => {
+        return await ctx.db.transaction.update({
+          where: { id: input.transactionId },
+          data: { deletedAt: null },
+        });
+      });
+
+      if (restoreError !== null) {
+        console.error("Error restoring transaction:", restoreError);
+        return {
+          data: null,
+          error: { message: "An error occurred while restoring the transaction.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      return { data: "Transaction restored successfully", error: null };
     }),
 
   getDetailedBalances: groupMemberProcedure

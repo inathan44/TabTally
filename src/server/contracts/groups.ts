@@ -41,6 +41,16 @@ export const restoreInviteSchema = z.object({
   userId: z.string(),
 });
 
+export const deleteTransactionSchema = z.object({
+  groupId: groupId,
+  transactionId: z.number().int().positive(),
+});
+
+export const restoreTransactionSchema = z.object({
+  groupId: groupId,
+  transactionId: z.number().int().positive(),
+});
+
 export const createTransactionSchema = z.object({
   groupId: groupId,
   amount: z.number().positive("Amount must be greater than 0"),
