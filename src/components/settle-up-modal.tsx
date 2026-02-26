@@ -73,7 +73,7 @@ export default function SettleUpModal({
     },
   });
 
-  const settleMutation = api.group.createTransaction.useMutation();
+  const settleMutation = api.group.createSettlement.useMutation();
 
   const onSubmit = async (data: SettleUpForm) => {
     setError(null);
@@ -82,9 +82,8 @@ export default function SettleUpModal({
     const result = await settleMutation.mutateAsync({
       groupId,
       payerId: fromUserId,
+      recipientId: toUserId,
       amount,
-      isSettlement: true,
-      transactionDetails: [{ recipientId: toUserId, amount }],
     });
 
     if (result.error) {

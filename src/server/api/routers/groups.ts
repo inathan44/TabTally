@@ -14,6 +14,8 @@ import type { ApiResponse } from "~/server/contracts/apiResponse";
 import {
   createGroupSchema,
   createTransactionSchema,
+  updateTransactionSchema,
+  createSettlementSchema,
   deleteGroupSchema,
   inviteMemberSchema,
   uninviteMemberSchema,
@@ -777,41 +779,7 @@ export const groupRouter = createTRPCRouter({
   createTransaction: groupMemberProcedure
     .input(createTransactionSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
-      // Group membership is verified by middleware
-      const isSettlement = input.isSettlement ?? false;
-
-      // Settlement-specific validation
-      if (isSettlement) {
-        if (input.transactionDetails.length !== 1) {
-          return {
-            data: null,
-            error: { message: "Settlements must have exactly one recipient.", code: "BAD_REQUEST" },
-          };
-        }
-        if (input.payerId === input.transactionDetails[0]!.recipientId) {
-          return {
-            data: null,
-            error: { message: "Cannot settle up with yourself.", code: "BAD_REQUEST" },
-          };
-        }
-        // Only the payer or recipient can record a settlement
-        const recipientId = input.transactionDetails[0]!.recipientId;
-        if (ctx.userId !== input.payerId && ctx.userId !== recipientId) {
-          return {
-            data: null,
-            error: {
-              message: "Only the payer or recipient can record this settlement.",
-              code: "FORBIDDEN",
-            },
-          };
-        }
-      }
-
-      // Regular transactions require amounts to add up
-      if (
-        !isSettlement &&
-        !verifyTransactionDetails(input.amount, input.transactionDetails, input.payerId)
-      ) {
+      if (!verifyTransactionDetails(input.amount, input.transactionDetails, input.payerId)) {
         return {
           data: null,
           error: {
@@ -835,45 +803,30 @@ export const groupRouter = createTRPCRouter({
         return { data: null, error: membershipError };
       }
 
-      // Create the transaction and transaction details in a database transaction
-      // Settlements are stored with negative amounts (payback, not expense)
-      const storedAmount = isSettlement ? -input.amount : input.amount;
-
       const { data: transaction, error: transactionError } = await withCatch(async () => {
         return await ctx.db.$transaction(async (tx) => {
-          console.log("Creating transaction for group:", input.groupId, "by user:", ctx.userId);
-
-          // Create the main transaction
           const newTransaction = await tx.transaction.create({
             data: {
               groupId: input.groupId,
-              amount: storedAmount,
-              description: isSettlement ? "Settlement" : (input.description ?? null),
+              amount: input.amount,
+              description: input.description ?? null,
               transactionDate: input.transactionDate,
               payerId: input.payerId,
               createdById: ctx.userId,
-              isSettlement,
             },
           });
 
-          console.log("Created transaction with ID:", newTransaction.id);
-
-          // Create all transaction details
-          const transactionDetails = await Promise.all(
+          await Promise.all(
             input.transactionDetails.map(async (detail) => {
               return await tx.transactionDetail.create({
                 data: {
                   transactionId: newTransaction.id,
                   recipientId: detail.recipientId,
                   groupId: input.groupId,
-                  amount: isSettlement ? -detail.amount : detail.amount,
+                  amount: detail.amount,
                 },
               });
             }),
-          );
-
-          console.log(
-            `Created ${transactionDetails.length} transaction details for transaction ${newTransaction.id}`,
           );
 
           return newTransaction;
@@ -891,8 +844,163 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      console.log("Transaction created successfully:", transaction.id);
       return { data: "Transaction created successfully", error: null };
+    }),
+
+  createSettlement: groupMemberProcedure
+    .input(createSettlementSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      if (input.payerId === input.recipientId) {
+        return {
+          data: null,
+          error: { message: "Cannot settle up with yourself.", code: "BAD_REQUEST" },
+        };
+      }
+
+      // Only the payer or recipient can record a settlement
+      if (ctx.userId !== input.payerId && ctx.userId !== input.recipientId) {
+        return {
+          data: null,
+          error: { message: "Only the payer or recipient can record a settlement.", code: "FORBIDDEN" },
+        };
+      }
+
+      const { error: membershipError } = await verifyUsersAreGroupMembers(
+        ctx,
+        input.groupId,
+        [input.payerId, input.recipientId],
+      );
+      if (membershipError !== null) {
+        return { data: null, error: membershipError };
+      }
+
+      const { error: transactionError } = await withCatch(async () => {
+        return await ctx.db.$transaction(async (tx) => {
+          const settlement = await tx.transaction.create({
+            data: {
+              groupId: input.groupId,
+              amount: -input.amount,
+              description: "Settlement",
+              isSettlement: true,
+              transactionDate: new Date(),
+              payerId: input.payerId,
+              createdById: ctx.userId,
+            },
+          });
+
+          await tx.transactionDetail.create({
+            data: {
+              transactionId: settlement.id,
+              recipientId: input.recipientId,
+              groupId: input.groupId,
+              amount: -input.amount,
+            },
+          });
+
+          return settlement;
+        });
+      });
+
+      if (transactionError !== null) {
+        console.error("Error creating settlement:", transactionError);
+        return {
+          data: null,
+          error: { message: "An error occurred while recording the settlement.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      return { data: "Settlement recorded successfully", error: null };
+    }),
+
+  updateTransaction: groupMemberProcedure
+    .input(updateTransactionSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      // Fetch existing transaction to check permissions
+      const { data: existingTransaction, error: fetchError } = await withCatch(async () => {
+        return await ctx.db.transaction.findFirst({
+          where: { id: input.transactionId, groupId: input.groupId, deletedAt: null },
+        });
+      });
+
+      if (fetchError !== null || !existingTransaction) {
+        return {
+          data: null,
+          error: { message: "Transaction not found.", code: "NOT_FOUND" },
+        };
+      }
+
+      // Cannot edit settlements through this route
+      if (existingTransaction.isSettlement) {
+        return {
+          data: null,
+          error: { message: "Settlements cannot be edited. Delete and recreate instead.", code: "BAD_REQUEST" },
+        };
+      }
+
+      // Only the record creator or a group admin can edit
+      const { error: permError } = canModifyRecord(ctx.userId, existingTransaction.createdById, ctx.isGroupAdmin);
+      if (permError) {
+        return { data: null, error: permError };
+      }
+
+      if (!verifyTransactionDetails(input.amount, input.transactionDetails, input.payerId)) {
+        return {
+          data: null,
+          error: {
+            message: "Invalid transaction details. Please check that amounts add up correctly and no user is selected more than once.",
+            code: "BAD_REQUEST",
+          },
+        };
+      }
+
+      // Verify all users are group members
+      const allRecipientIds = input.transactionDetails.map((detail) => detail.recipientId);
+      const allUserIds = [input.payerId, ...allRecipientIds];
+      const { error: membershipError } = await verifyUsersAreGroupMembers(ctx, input.groupId, allUserIds);
+      if (membershipError !== null) {
+        return { data: null, error: membershipError };
+      }
+
+      const { error: updateError } = await withCatch(async () => {
+        return await ctx.db.$transaction(async (tx) => {
+          await tx.transactionDetail.deleteMany({
+            where: { transactionId: input.transactionId },
+          });
+
+          await tx.transaction.update({
+            where: { id: input.transactionId },
+            data: {
+              amount: input.amount,
+              description: input.description ?? null,
+              transactionDate: input.transactionDate,
+              payerId: input.payerId,
+            },
+          });
+
+          await Promise.all(
+            input.transactionDetails.map(async (detail) => {
+              return await tx.transactionDetail.create({
+                data: {
+                  transactionId: input.transactionId,
+                  recipientId: detail.recipientId,
+                  groupId: input.groupId,
+                  amount: detail.amount,
+                },
+              });
+            }),
+          );
+        });
+      });
+
+      if (updateError !== null) {
+        console.error("Error updating transaction:", updateError);
+        return {
+          data: null,
+          error: { message: "An error occurred while updating the transaction.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      return { data: "Transaction updated successfully", error: null };
     }),
 
   getDetailedBalances: groupMemberProcedure
@@ -1061,6 +1169,23 @@ function verifyTransactionDetails(
   }
 
   return true;
+}
+
+function canModifyRecord(
+  userId: string | null,
+  recordCreatedById: string,
+  isGroupAdmin: boolean,
+): ApiResponse<void> {
+  if (isGroupAdmin || recordCreatedById === userId) {
+    return { data: undefined, error: null };
+  }
+  return {
+    data: null,
+    error: {
+      message: "Only the record creator or a group admin can perform this action.",
+      code: "FORBIDDEN",
+    },
+  };
 }
 
 async function verifyUsersAreGroupMembers(

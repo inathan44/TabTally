@@ -47,10 +47,20 @@ export const createTransactionSchema = z.object({
   payerId: z.string(),
   description: z.string().max(255).optional(),
   transactionDate: z.coerce.date().default(() => new Date()),
-  isSettlement: z.boolean().default(false).optional(),
   transactionDetails: z
     .array(createTransactionDetailSchema)
     .min(1, "At least one transaction detail is required"),
+});
+
+export const updateTransactionSchema = createTransactionSchema.extend({
+  transactionId: z.number().int().positive(),
+});
+
+export const createSettlementSchema = z.object({
+  groupId: groupId,
+  payerId: z.string().min(1, "Payer is required"),
+  recipientId: z.string().min(1, "Recipient is required"),
+  amount: z.number().positive("Amount must be greater than 0"),
 });
 
 // Client-side form schema for the transaction creation modal

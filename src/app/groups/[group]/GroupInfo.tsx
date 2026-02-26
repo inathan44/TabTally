@@ -62,7 +62,7 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
   } = api.group.getGroupBySlug.useQuery({ slug: groupSlug });
 
   const group = groupResponse?.data;
-  const { isGroupAdmin } = useGroupPermissions(group);
+  const { isGroupAdmin, currentMember } = useGroupPermissions(group);
 
   if (isPending) {
     return (
@@ -194,7 +194,7 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
           </TabsList>
 
           <TabsContent value="transactions" className="mt-6">
-            <TransactionsTab group={group} totalSpending={totalSpending} />
+            <TransactionsTab group={group} totalSpending={totalSpending} isGroupAdmin={isGroupAdmin} userId={currentMember?.id} />
           </TabsContent>
 
           <TabsContent value="balances" className="mt-6">

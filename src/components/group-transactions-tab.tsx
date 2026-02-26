@@ -1,21 +1,33 @@
 "use client";
 
-import { DollarSign, Receipt } from "lucide-react";
+import { useState } from "react";
+import { DollarSign, Pencil, Receipt } from "lucide-react";
 import CreateTransactionModal from "~/components/create-transaction-modal";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import type { GetGroupResponse } from "~/server/contracts/groups";
+import type { SafeTransaction } from "~/server/contracts/transactions";
 import { cn } from "~/lib/utils";
 
 interface TransactionsTabProps {
   group: GetGroupResponse;
   totalSpending: number;
+  isGroupAdmin: boolean;
+  userId: string | null | undefined;
 }
 
 export default function TransactionsTab({
   group,
   totalSpending,
+  isGroupAdmin,
+  userId,
 }: TransactionsTabProps) {
+  const [editingTransaction, setEditingTransaction] = useState<SafeTransaction | null>(null);
+
+  const canEdit = (transaction: SafeTransaction) =>
+    isGroupAdmin || transaction.createdById === userId;
+
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
@@ -84,15 +96,27 @@ export default function TransactionsTab({
                         </p>
                       </div>
                     </div>
-                    <span className={cn(
-                      "text-sm font-semibold",
-                      {
-                        "text-green-600": transaction.isSettlement,
-                        "text-foreground": !transaction.isSettlement,
-                      },
-                    )}>
-                      ${Math.abs(Number(transaction.amount)).toFixed(2)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-sm font-semibold",
+                        {
+                          "text-green-600": transaction.isSettlement,
+                          "text-foreground": !transaction.isSettlement,
+                        },
+                      )}>
+                        ${Math.abs(Number(transaction.amount)).toFixed(2)}
+                      </span>
+                      {canEdit(transaction) && !transaction.isSettlement && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={() => setEditingTransaction(transaction)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {!transaction.isSettlement && transaction.transactionDetails?.length > 0 && (
@@ -127,6 +151,16 @@ export default function TransactionsTab({
             Add your first expense to get started.
           </p>
         </div>
+      )}
+
+      {editingTransaction && (
+        <CreateTransactionModal
+          groupId={group.id}
+          groupMembers={group.members}
+          editTransaction={editingTransaction}
+          open={!!editingTransaction}
+          onOpenChange={(open) => { if (!open) setEditingTransaction(null); }}
+        />
       )}
     </div>
   );

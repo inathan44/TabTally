@@ -221,54 +221,6 @@ const requireGroupMembershipMiddleware = t.middleware(async ({ next, ctx, getRaw
     });
   }
 
-  const { data: isMemberResponse, error: membershipError } = await withCatch(async () => {
-    return await ctx.db.groupMember.findFirst({
-      where: {
-        groupId: inputWithGroupId.groupId,
-        memberId: ctx.userId!,
-        status: "JOINED" as GroupMemberStatus,
-        deletedAt: null,
-      },
-    });
-  });
-
-  if (membershipError !== null) {
-    console.error("[TRPC] Error checking group membership in middleware:", membershipError);
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "An error occurred while checking group membership.",
-    });
-  }
-
-  const isMember = isMemberResponse !== null;
-
-  if (!isMember) {
-    console.warn(
-      "[TRPC] User is not a member of the group:",
-      ctx.userId,
-      "groupId:",
-      inputWithGroupId.groupId,
-    );
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "You must be a member of this group to perform this action",
-    });
-  }
-
-  return next();
-});
-
-const requireGroupAdminMiddleware = t.middleware(async ({ next, ctx, getRawInput }) => {
-  const rawInput = await getRawInput();
-  const inputWithGroupId = rawInput as { groupId?: number };
-
-  if (!inputWithGroupId?.groupId) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Internal error: groupId is required for this operation",
-    });
-  }
-
   const { data: membership, error: membershipError } = await withCatch(async () => {
     return await ctx.db.groupMember.findFirst({
       where: {
@@ -282,28 +234,34 @@ const requireGroupAdminMiddleware = t.middleware(async ({ next, ctx, getRawInput
   });
 
   if (membershipError !== null) {
+    console.error("[TRPC] Error checking group membership in middleware:", membershipError);
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: "An error occurred while checking permissions.",
+      message: "An error occurred while checking group membership.",
     });
   }
 
   if (!membership) {
+    console.warn(
+      "[TRPC] User is not a member of the group:",
+      ctx.userId,
+      "groupId:",
+      inputWithGroupId.groupId,
+    );
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "You must be a member of this group to perform this action",
     });
   }
 
-  const isCreator = membership.group.createdById === ctx.userId;
-  if (!membership.isAdmin && !isCreator) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Only admins or the group creator can perform this action",
-    });
-  }
+  const isGroupAdmin = membership.isAdmin || membership.group.createdById === ctx.userId;
 
-  return next();
+  return next({
+    ctx: {
+      groupMember: membership,
+      isGroupAdmin,
+    },
+  });
 });
 
 export const publicProcedure = t.procedure.use(timingMiddleware);
@@ -312,7 +270,15 @@ export const protectedProcedure = t.procedure
   .use(authMiddleware)
   .use(findOrCreateUserMiddleware);
 export const groupMemberProcedure = protectedProcedure.use(requireGroupMembershipMiddleware);
-export const groupAdminProcedure = groupMemberProcedure.use(requireGroupAdminMiddleware);
+export const groupAdminProcedure = groupMemberProcedure.use(async ({ next, ctx }) => {
+  if (!ctx.isGroupAdmin) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only admins or the group creator can perform this action",
+    });
+  }
+  return next();
+});
 
 export type TRPCContext = Awaited<ReturnType<typeof createTRPCContext>>;
 

@@ -39,6 +39,7 @@ import { api } from "~/trpc/react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import type { GroupMember } from "~/server/contracts/groups";
 import { createTransactionFormSchema } from "~/server/contracts/groups";
+import type { SafeTransaction } from "~/server/contracts/transactions";
 import { AnimatedButton } from "./ui/animated-button";
 
 export type CreateTransactionForm = z.infer<typeof createTransactionFormSchema>;
@@ -46,29 +47,55 @@ export type CreateTransactionForm = z.infer<typeof createTransactionFormSchema>;
 interface CreateTransactionModalProps {
   groupId: number;
   groupMembers: GroupMember[];
+  editTransaction?: SafeTransaction;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export default function CreateTransactionModal({
   groupId,
   groupMembers,
+  editTransaction,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }: CreateTransactionModalProps) {
+  const isEditMode = !!editTransaction;
   const utils = api.useUtils();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [transactionError, setTransactionError] = useState<string | null>(null);
 
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? (controlledOnOpenChange ?? (() => {})) : setInternalOpen;
+
+  const defaultValues = isEditMode
+    ? {
+        amount: Math.abs(Number(editTransaction.amount)).toFixed(2),
+        description: editTransaction.description ?? "",
+        payerId: editTransaction.payerId,
+        transactionDate: new Date(editTransaction.transactionDate),
+        splits: editTransaction.transactionDetails.map((d) => ({
+          recipientId: d.recipientId,
+          amount: Math.abs(Number(d.amount)).toFixed(2),
+        })),
+      }
+    : {
+        amount: "",
+        description: "",
+        payerId: "",
+        transactionDate: new Date(),
+        splits: [] as { recipientId: string; amount: string }[],
+      };
+
   const form = useForm({
     resolver: zodResolver(createTransactionFormSchema),
-    defaultValues: {
-      amount: "",
-      description: "",
-      payerId: "",
-      transactionDate: new Date(),
-      splits: [] as { recipientId: string; amount: string }[],
-    },
+    defaultValues,
   });
 
   const createTransactionMutation = api.group.createTransaction.useMutation();
+  const updateTransactionMutation = api.group.updateTransaction.useMutation();
+  const activeMutation = isEditMode ? updateTransactionMutation : createTransactionMutation;
 
   const { fields, replace, append, remove } = useFieldArray({
     control: form.control,
@@ -154,14 +181,21 @@ export default function CreateTransactionModal({
         return;
       }
 
-      const result = await createTransactionMutation.mutateAsync({
+      const basePayload = {
         groupId,
         amount: amountValue,
         description: values.description,
         payerId: values.payerId,
         transactionDate: values.transactionDate,
         transactionDetails: splitValues,
-      });
+      };
+
+      const result = isEditMode
+        ? await updateTransactionMutation.mutateAsync({
+            ...basePayload,
+            transactionId: editTransaction.id,
+          })
+        : await createTransactionMutation.mutateAsync(basePayload);
 
       if (result.error) {
         setTransactionError(result.error.message);
@@ -169,19 +203,19 @@ export default function CreateTransactionModal({
         setOpen(false);
         void utils.group.getGroupBySlug.invalidate();
         form.reset();
-        createTransactionMutation.reset();
+        activeMutation.reset();
         setTransactionError(null);
       }
     } catch (error) {
-      console.error("Transaction creation error:", error);
+      console.error("Transaction error:", error);
       setTransactionError("An unexpected error occurred. Please try again.");
     }
   };
 
   const resetModal = () => {
-    form.reset();
+    form.reset(defaultValues);
     setTransactionError(null);
-    createTransactionMutation.reset();
+    activeMutation.reset();
   };
 
   const totalSplitAmount = watchedSplits.reduce(
@@ -203,16 +237,20 @@ export default function CreateTransactionModal({
         }
       }}
     >
-      <DialogTrigger asChild>
-        <Button className="">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Transaction
-        </Button>
-      </DialogTrigger>
+      {!isEditMode && (
+        <DialogTrigger asChild>
+          <Button className="">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Transaction
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Create New Transaction</DialogTitle>
-          <DialogDescription>Add a new expense to split between group members</DialogDescription>
+          <DialogTitle>{isEditMode ? "Edit Transaction" : "Create New Transaction"}</DialogTitle>
+          <DialogDescription>
+            {isEditMode ? "Update the transaction details" : "Add a new expense to split between group members"}
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -472,17 +510,17 @@ export default function CreateTransactionModal({
             <div className="flex justify-end">
               <AnimatedButton
                 type="submit"
-                loading={createTransactionMutation.isPending}
+                loading={activeMutation.isPending}
                 success={
-                  createTransactionMutation.isSuccess && !createTransactionMutation.data?.error
+                  activeMutation.isSuccess && !activeMutation.data?.error
                 }
-                successText="Transaction Created!"
+                successText={isEditMode ? "Transaction Updated!" : "Transaction Created!"}
                 disabled={
-                  createTransactionMutation.isPending || createTransactionMutation.isSuccess
+                  activeMutation.isPending || activeMutation.isSuccess
                 }
                 className="min-w-[140px]"
               >
-                Create Transaction
+                {isEditMode ? "Update Transaction" : "Create Transaction"}
               </AnimatedButton>
             </div>
           </form>
