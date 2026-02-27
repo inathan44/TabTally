@@ -25,6 +25,7 @@ export default function Navbar() {
   const navItems = [
     { href: "/", label: "Home" },
     { href: "/groups", label: "Groups" },
+    { href: "/profile", label: "Profile" },
     ...(process.env.NODE_ENV === "development"
       ? [{ href: "/sandbox", label: "Playground" }]
       : []),

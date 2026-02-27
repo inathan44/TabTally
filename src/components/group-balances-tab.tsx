@@ -20,6 +20,8 @@ interface SettleUpTarget {
   toUserId: string;
   toUserName: string;
   amount: number;
+  toVenmoUsername: string | null;
+  toCashappUsername: string | null;
 }
 
 export default function BalancesTab({ group }: BalancesTabProps) {
@@ -61,12 +63,10 @@ export default function BalancesTab({ group }: BalancesTabProps) {
 
   if (group.settlements.length === 0) {
     return (
-      <div className="rounded-xl border-2 border-dashed border-border px-6 py-12 text-center">
+      <div className="border-border rounded-xl border-2 border-dashed px-6 py-12 text-center">
         <CheckCircle2 className="mx-auto h-8 w-8 text-green-500/60" />
-        <p className="mt-3 text-sm font-medium text-foreground">All settled up!</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          No outstanding balances in this group.
-        </p>
+        <p className="text-foreground mt-3 text-sm font-medium">All settled up!</p>
+        <p className="text-muted-foreground mt-1 text-xs">No outstanding balances in this group.</p>
       </div>
     );
   }
@@ -86,28 +86,30 @@ export default function BalancesTab({ group }: BalancesTabProps) {
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-red-500/8 text-[11px] font-medium text-red-500">
-                      {from.firstName.charAt(0)}{from.lastName.charAt(0)}
+                      {from.firstName.charAt(0)}
+                      {from.lastName.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                   <span className="text-sm font-medium">{from.firstName}</span>
                 </div>
 
                 <div className="flex flex-1 items-center justify-center gap-2">
-                  <div className="h-px flex-1 bg-border" />
-                  <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1">
-                    <span className="text-xs font-semibold text-foreground">
+                  <div className="bg-border h-px flex-1" />
+                  <div className="border-border bg-muted/50 flex items-center gap-1.5 rounded-full border px-3 py-1">
+                    <span className="text-foreground text-xs font-semibold">
                       ${settlement.amount.toFixed(2)}
                     </span>
-                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    <ArrowRight className="text-muted-foreground h-3 w-3" />
                   </div>
-                  <div className="h-px flex-1 bg-border" />
+                  <div className="bg-border h-px flex-1" />
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium">{to.firstName}</span>
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-green-500/8 text-[11px] font-medium text-green-600">
-                      {to.firstName.charAt(0)}{to.lastName.charAt(0)}
+                      {to.firstName.charAt(0)}
+                      {to.lastName.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                 </div>
@@ -117,13 +119,17 @@ export default function BalancesTab({ group }: BalancesTabProps) {
                     variant="outline"
                     size="sm"
                     className="ml-2 shrink-0 text-xs"
-                    onClick={() => setSettleTarget({
-                      fromUserId: settlement.fromUserId,
-                      fromUserName: `${from.firstName} ${from.lastName}`,
-                      toUserId: settlement.toUserId,
-                      toUserName: `${to.firstName} ${to.lastName}`,
-                      amount: settlement.amount,
-                    })}
+                    onClick={() =>
+                      setSettleTarget({
+                        fromUserId: settlement.fromUserId,
+                        fromUserName: `${from.firstName} ${from.lastName}`,
+                        toUserId: settlement.toUserId,
+                        toUserName: `${to.firstName} ${to.lastName}`,
+                        amount: settlement.amount,
+                        toVenmoUsername: to.venmoUsername,
+                        toCashappUsername: to.cashappUsername,
+                      })
+                    }
                   >
                     Settle
                   </Button>
@@ -136,7 +142,7 @@ export default function BalancesTab({ group }: BalancesTabProps) {
 
       {/* Per-person breakdown */}
       <div className="space-y-3">
-        <h3 className="text-sm font-medium text-muted-foreground">Per-person breakdown</h3>
+        <h3 className="text-muted-foreground text-sm font-medium">Per-person breakdown</h3>
         <div className="space-y-2">
           {membersWithBalances.map((member) => {
             const balance = group.balances[member.id]!;
@@ -156,17 +162,20 @@ export default function BalancesTab({ group }: BalancesTabProps) {
                             "bg-red-500/8 text-red-500": !isCreditor,
                           })}
                         >
-                          {member.firstName.charAt(0)}{member.lastName.charAt(0)}
+                          {member.firstName.charAt(0)}
+                          {member.lastName.charAt(0)}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="text-sm font-medium text-foreground">
+                        <p className="text-foreground text-sm font-medium">
                           {member.firstName} {member.lastName}
                         </p>
-                        <p className={cn("text-xs", {
-                          "text-green-600": isCreditor,
-                          "text-red-500": !isCreditor,
-                        })}>
+                        <p
+                          className={cn("text-xs", {
+                            "text-green-600": isCreditor,
+                            "text-red-500": !isCreditor,
+                          })}
+                        >
                           {isCreditor
                             ? `Owed $${balance.netBalance.toFixed(2)} total`
                             : `Owes $${Math.abs(balance.netBalance).toFixed(2)} total`}
@@ -177,10 +186,10 @@ export default function BalancesTab({ group }: BalancesTabProps) {
 
                   {/* Detail rows */}
                   {(debts.length > 0 || credits.length > 0) && (
-                    <div className="ml-12 mt-3 space-y-1.5 border-t border-border pt-3">
+                    <div className="border-border mt-3 ml-12 space-y-1.5 border-t pt-3">
                       {credits.map((credit) => (
                         <div key={credit.from.id} className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-muted-foreground text-xs">
                             {credit.from.firstName} {credit.from.lastName} pays them
                           </span>
                           <span className="text-xs font-medium text-green-600">
@@ -190,7 +199,7 @@ export default function BalancesTab({ group }: BalancesTabProps) {
                       ))}
                       {debts.map((debt) => (
                         <div key={debt.to.id} className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-muted-foreground text-xs">
                             Pays {debt.to.firstName} {debt.to.lastName}
                           </span>
                           <span className="text-xs font-medium text-red-500">
@@ -210,13 +219,18 @@ export default function BalancesTab({ group }: BalancesTabProps) {
       {settleTarget && (
         <SettleUpModal
           open={!!settleTarget}
-          onOpenChange={(open) => { if (!open) setSettleTarget(null); }}
+          onOpenChange={(open) => {
+            if (!open) setSettleTarget(null);
+          }}
           groupId={group.id}
+          groupName={group.name}
           fromUserId={settleTarget.fromUserId}
           fromUserName={settleTarget.fromUserName}
           toUserId={settleTarget.toUserId}
           toUserName={settleTarget.toUserName}
           suggestedAmount={settleTarget.amount}
+          toVenmoUsername={settleTarget.toVenmoUsername}
+          toCashappUsername={settleTarget.toCashappUsername}
         />
       )}
     </div>

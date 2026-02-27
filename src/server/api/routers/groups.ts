@@ -159,6 +159,8 @@ export const groupRouter = createTRPCRouter({
                     firstName: true,
                     lastName: true,
                     createdAt: true,
+                    venmoUsername: true,
+                    cashappUsername: true,
                   },
                 },
               },
@@ -271,7 +273,14 @@ export const groupRouter = createTRPCRouter({
         const { data: users } = await withCatch(async () => {
           return await ctx.db.user.findMany({
             where: { id: { in: formerMemberIds } },
-            select: { id: true, firstName: true, lastName: true, createdAt: true },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              createdAt: true,
+              venmoUsername: true,
+              cashappUsername: true,
+            },
           });
         });
         if (users) {
@@ -338,11 +347,21 @@ export const groupRouter = createTRPCRouter({
           { description: { contains: term, mode: "insensitive" } },
           { payer: { firstName: { contains: term, mode: "insensitive" } } },
           { payer: { lastName: { contains: term, mode: "insensitive" } } },
-          { transactionDetails: { some: { recipient: { firstName: { contains: term, mode: "insensitive" } } } } },
-          { transactionDetails: { some: { recipient: { lastName: { contains: term, mode: "insensitive" } } } } },
+          {
+            transactionDetails: {
+              some: { recipient: { firstName: { contains: term, mode: "insensitive" } } },
+            },
+          },
+          {
+            transactionDetails: {
+              some: { recipient: { lastName: { contains: term, mode: "insensitive" } } },
+            },
+          },
           // Match category by checking if the search term matches any category enum value
           ...transactionCategories
-            .filter((cat) => transactionCategoryLabels[cat].toLowerCase().includes(term.toLowerCase()))
+            .filter((cat) =>
+              transactionCategoryLabels[cat].toLowerCase().includes(term.toLowerCase()),
+            )
             .map((cat) => ({ category: cat as TransactionCategory })),
         ];
       }
@@ -406,7 +425,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error fetching transactions:", fetchError);
         return {
           data: null,
-          error: { message: "An error occurred while fetching transactions.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while fetching transactions.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -523,7 +545,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error fetching group for restore:", fetchError);
         return {
           data: null,
-          error: { message: "An error occurred while fetching the group.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while fetching the group.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -537,7 +562,10 @@ export const groupRouter = createTRPCRouter({
       if (group.createdById !== ctx.userId) {
         return {
           data: null,
-          error: { message: "Only the group creator can restore a deleted group.", code: "FORBIDDEN" },
+          error: {
+            message: "Only the group creator can restore a deleted group.",
+            code: "FORBIDDEN",
+          },
         };
       }
 
@@ -552,7 +580,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error restoring group:", restoreError);
         return {
           data: null,
-          error: { message: "An error occurred while restoring the group.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while restoring the group.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -576,7 +607,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error updating group:", updateError);
         return {
           data: null,
-          error: { message: "An error occurred while updating the group.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while updating the group.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -625,7 +659,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error fetching member:", fetchError);
         return {
           data: null,
-          error: { message: "An error occurred while fetching the member.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while fetching the member.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -654,7 +691,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error updating member role:", updateError);
         return {
           data: null,
-          error: { message: "An error occurred while updating the member role.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while updating the member role.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -1142,15 +1182,17 @@ export const groupRouter = createTRPCRouter({
       if (ctx.userId !== input.payerId && ctx.userId !== input.recipientId) {
         return {
           data: null,
-          error: { message: "Only the payer or recipient can record a settlement.", code: "FORBIDDEN" },
+          error: {
+            message: "Only the payer or recipient can record a settlement.",
+            code: "FORBIDDEN",
+          },
         };
       }
 
-      const { error: membershipError } = await verifyUsersAreGroupMembers(
-        ctx,
-        input.groupId,
-        [input.payerId, input.recipientId],
-      );
+      const { error: membershipError } = await verifyUsersAreGroupMembers(ctx, input.groupId, [
+        input.payerId,
+        input.recipientId,
+      ]);
       if (membershipError !== null) {
         return { data: null, error: membershipError };
       }
@@ -1186,7 +1228,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error creating settlement:", transactionError);
         return {
           data: null,
-          error: { message: "An error occurred while recording the settlement.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while recording the settlement.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -1207,7 +1252,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error fetching transaction:", fetchError);
         return {
           data: null,
-          error: { message: "An error occurred while fetching the transaction.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while fetching the transaction.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -1222,12 +1270,19 @@ export const groupRouter = createTRPCRouter({
       if (existingTransaction.isSettlement) {
         return {
           data: null,
-          error: { message: "Settlements cannot be edited. Delete and recreate instead.", code: "BAD_REQUEST" },
+          error: {
+            message: "Settlements cannot be edited. Delete and recreate instead.",
+            code: "BAD_REQUEST",
+          },
         };
       }
 
       // Only the record creator or a group admin can edit
-      const { error: permError } = canModifyRecord(ctx.userId, existingTransaction.createdById, ctx.isGroupAdmin);
+      const { error: permError } = canModifyRecord(
+        ctx.userId,
+        existingTransaction.createdById,
+        ctx.isGroupAdmin,
+      );
       if (permError) {
         return { data: null, error: permError };
       }
@@ -1236,7 +1291,8 @@ export const groupRouter = createTRPCRouter({
         return {
           data: null,
           error: {
-            message: "Invalid transaction details. Please check that amounts add up correctly and no user is selected more than once.",
+            message:
+              "Invalid transaction details. Please check that amounts add up correctly and no user is selected more than once.",
             code: "BAD_REQUEST",
           },
         };
@@ -1245,7 +1301,11 @@ export const groupRouter = createTRPCRouter({
       // Verify all users are group members
       const allRecipientIds = input.transactionDetails.map((detail) => detail.recipientId);
       const allUserIds = [input.payerId, ...allRecipientIds];
-      const { error: membershipError } = await verifyUsersAreGroupMembers(ctx, input.groupId, allUserIds);
+      const { error: membershipError } = await verifyUsersAreGroupMembers(
+        ctx,
+        input.groupId,
+        allUserIds,
+      );
       if (membershipError !== null) {
         return { data: null, error: membershipError };
       }
@@ -1287,7 +1347,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error updating transaction:", updateError);
         return {
           data: null,
-          error: { message: "An error occurred while updating the transaction.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while updating the transaction.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -1307,7 +1370,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error fetching transaction:", fetchError);
         return {
           data: null,
-          error: { message: "An error occurred while fetching the transaction.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while fetching the transaction.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -1318,7 +1384,11 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      const { error: permError } = canModifyRecord(ctx.userId, transaction.createdById, ctx.isGroupAdmin);
+      const { error: permError } = canModifyRecord(
+        ctx.userId,
+        transaction.createdById,
+        ctx.isGroupAdmin,
+      );
       if (permError) {
         return { data: null, error: permError };
       }
@@ -1334,7 +1404,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error deleting transaction:", deleteError);
         return {
           data: null,
-          error: { message: "An error occurred while deleting the transaction.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while deleting the transaction.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -1354,7 +1427,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error fetching transaction:", fetchError);
         return {
           data: null,
-          error: { message: "An error occurred while fetching the transaction.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while fetching the transaction.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -1365,7 +1441,11 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      const { error: permError } = canModifyRecord(ctx.userId, transaction.createdById, ctx.isGroupAdmin);
+      const { error: permError } = canModifyRecord(
+        ctx.userId,
+        transaction.createdById,
+        ctx.isGroupAdmin,
+      );
       if (permError) {
         return { data: null, error: permError };
       }
@@ -1381,7 +1461,10 @@ export const groupRouter = createTRPCRouter({
         console.error("Error restoring transaction:", restoreError);
         return {
           data: null,
-          error: { message: "An error occurred while restoring the transaction.", code: "INTERNAL_SERVER_ERROR" },
+          error: {
+            message: "An error occurred while restoring the transaction.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
         };
       }
 
@@ -1393,12 +1476,7 @@ export const groupRouter = createTRPCRouter({
       z.object({
         groupId: z.number().int().positive(),
         fileName: z.string().min(1).max(255),
-        mimeType: z.enum([
-          "image/jpeg",
-          "image/png",
-          "image/heic",
-          "application/pdf",
-        ]),
+        mimeType: z.enum(["image/jpeg", "image/png", "image/heic", "application/pdf"]),
       }),
     )
     .mutation(async ({ ctx, input }): Promise<ApiResponse<UploadResult>> => {

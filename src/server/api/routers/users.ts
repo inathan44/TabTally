@@ -3,10 +3,68 @@ import { withCatch } from "~/lib/utils";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import type { ApiResponse } from "~/server/contracts/apiResponse";
-import type { GetUserGroupsResponse, SafeUser } from "~/server/contracts/users";
+import type { GetUserGroupsResponse, SafeUser, UserProfile } from "~/server/contracts/users";
+import { updatePaymentUsernamesSchema } from "~/server/contracts/users";
 import { calculateGroupBalances } from "~/server/helpers/balanceCalculation";
 
 export const userRouter = createTRPCRouter({
+  getProfile: protectedProcedure.query(async ({ ctx }): Promise<ApiResponse<UserProfile>> => {
+    const { data: user, error } = await withCatch(
+      async () =>
+        await ctx.db.user.findUnique({
+          where: { id: ctx.userId, deletedAt: null },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            venmoUsername: true,
+            cashappUsername: true,
+            createdAt: true,
+          },
+        }),
+    );
+
+    if (error !== null) {
+      return {
+        data: null,
+        error: { message: "Failed to load profile.", code: "INTERNAL_SERVER_ERROR" },
+      };
+    }
+
+    if (!user) {
+      return {
+        data: null,
+        error: { message: "User not found.", code: "NOT_FOUND" },
+      };
+    }
+
+    return { data: user, error: null };
+  }),
+
+  updatePaymentUsernames: protectedProcedure
+    .input(updatePaymentUsernamesSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      const { error } = await withCatch(async () => {
+        return await ctx.db.user.update({
+          where: { id: ctx.userId },
+          data: {
+            venmoUsername: input.venmoUsername?.trim() || null,
+            cashappUsername: input.cashappUsername?.trim() || null,
+          },
+        });
+      });
+
+      if (error !== null) {
+        return {
+          data: null,
+          error: { message: "Failed to update payment usernames.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      return { data: "Payment usernames updated successfully", error: null };
+    }),
+
   getUserById: protectedProcedure
     .input(z.string().min(1))
     .query(async ({ ctx, input }): Promise<ApiResponse<SafeUser>> => {
