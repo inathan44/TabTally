@@ -40,6 +40,7 @@ export const groupRouter = createTRPCRouter({
   createGroup: protectedProcedure
     .input(createGroupSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      console.log(`[createGroup] User ${ctx.userId} creating group "${input.name}"`);
       const { data, error } = await withCatch(async () => {
         return await ctx.db.$transaction(async (tx) => {
           const temporarySlug = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -53,16 +54,12 @@ export const groupRouter = createTRPCRouter({
             },
           });
 
-          console.log("New group created with temporary slug:", newGroup.id, temporarySlug);
-
           const slug = createGroupSlug(input.name, newGroup.id);
 
           const updatedGroup = await tx.group.update({
             where: { id: newGroup.id },
             data: { slug },
           });
-
-          console.log("Adding group creator to group members:", ctx.userId);
 
           await tx.groupMember.create({
             data: {
@@ -76,8 +73,6 @@ export const groupRouter = createTRPCRouter({
 
           // Invite additional users if provided
           if (input.invitedUsers && input.invitedUsers.length > 0) {
-            console.log("Inviting additional users to group:", input.invitedUsers.length);
-
             // First, verify all invited users exist in the database
             const invitedUserIds = input.invitedUsers.map((user) => user.userId);
             const existingUsers = await tx.user.findMany({
@@ -94,7 +89,9 @@ export const groupRouter = createTRPCRouter({
             );
 
             if (nonExistentUsers.length > 0) {
-              console.error("Some invited users do not exist:", nonExistentUsers);
+              console.error(
+                `[createGroup] Non-existent invited user IDs: ${nonExistentUsers.join(", ")}`,
+              );
               throw new Error(
                 `The following user IDs do not exist: ${nonExistentUsers.join(", ")}`,
               );
@@ -113,18 +110,14 @@ export const groupRouter = createTRPCRouter({
                 });
               }),
             );
-
-            console.log("Completed inviting additional users to group");
           }
-
-          console.log("Completed create group transaction:", updatedGroup.id);
 
           return updatedGroup;
         });
       });
 
       if (error !== null) {
-        console.error("Error creating group:", error);
+        console.error(`[createGroup] Failed for user ${ctx.userId}:`, error);
         return {
           data: null,
           error: {
@@ -136,7 +129,7 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      console.log("Group created successfully:", data.id, "with slug:", data.slug);
+      console.log(`[createGroup] Created group ${data.id}, slug=${data.slug}`);
 
       return { data: data.slug, error: null };
     }),
@@ -144,6 +137,7 @@ export const groupRouter = createTRPCRouter({
   getGroupBySlug: protectedProcedure
     .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }): Promise<ApiResponse<GetGroupResponse>> => {
+      console.log(`[getGroupBySlug] User ${ctx.userId} fetching group slug="${input.slug}"`);
       const { data: group, error: groupError } = await withCatch(async () => {
         return await ctx.db.group.findUnique({
           where: { slug: input.slug, deletedAt: null },
@@ -209,7 +203,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (groupError !== null) {
-        console.error("Error fetching group:", groupError);
+        console.error(`[getGroupBySlug] Failed to fetch slug="${input.slug}":`, groupError);
         return {
           data: null,
           error: {
@@ -220,7 +214,7 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!group) {
-        console.error("Group not found for slug:", input.slug);
+        console.warn(`[getGroupBySlug] Group not found for slug="${input.slug}"`);
         return {
           data: null,
           error: {
@@ -238,22 +232,23 @@ export const groupRouter = createTRPCRouter({
       );
       if (isMemberError !== null) {
         console.error(
-          "error checking group membership:",
-          isMemberError.message,
-          isMemberError.code,
+          `[getGroupBySlug] Membership check failed for user ${ctx.userId}:`,
+          isMemberError,
         );
         return { data: null, error: isMemberError };
       }
 
       if (!isMember) {
-        console.warn("User is not a member of the group:", ctx.userId);
+        console.warn(
+          `[getGroupBySlug] User ${ctx.userId} is not a member of group slug="${input.slug}"`,
+        );
         return {
           data: null,
           error: { message: "You are not a member of this group", code: "FORBIDDEN" },
         };
       }
 
-      console.log("Group fetched successfully:", group.slug);
+      console.log(`[getGroupBySlug] Returned group ${group.id}, slug="${group.slug}"`);
 
       const balanceData = calculateGroupBalances(
         group.transactions.map((t) => ({
@@ -343,6 +338,9 @@ export const groupRouter = createTRPCRouter({
   getGroupTransactions: groupMemberProcedure
     .input(getGroupTransactionsSchema)
     .query(async ({ ctx, input }): Promise<ApiResponse<SafeTransaction[]>> => {
+      console.log(
+        `[getGroupTransactions] User ${ctx.userId} fetching transactions for group ${input.groupId}`,
+      );
       const where: Prisma.TransactionWhereInput = {
         groupId: input.groupId,
         deletedAt: null,
@@ -432,7 +430,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (fetchError !== null) {
-        console.error("Error fetching transactions:", fetchError);
+        console.error(`[getGroupTransactions] Failed for group ${input.groupId}:`, fetchError);
         return {
           data: null,
           error: {
@@ -466,13 +464,18 @@ export const groupRouter = createTRPCRouter({
         })),
       }));
 
+      console.log(
+        `[getGroupTransactions] Returned ${mapped.length} transactions for group ${input.groupId}`,
+      );
       return { data: mapped, error: null };
     }),
 
   deleteGroup: protectedProcedure
     .input(deleteGroupSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
-      // First, fetch and validate the group
+      console.log(
+        `[deleteGroup] User ${ctx.userId} deleting group ${input.groupId}, hard=${input.hard ?? false}`,
+      );
       const { data: groupToDelete, error: fetchError } = await withCatch(async () => {
         return await ctx.db.group.findUnique({
           where: { id: input.groupId, deletedAt: null },
@@ -480,7 +483,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (fetchError !== null) {
-        console.error("Error fetching group for deletion:", fetchError);
+        console.error(`[deleteGroup] Failed to fetch group ${input.groupId}:`, fetchError);
         return {
           data: null,
           error: {
@@ -491,6 +494,7 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!groupToDelete) {
+        console.warn(`[deleteGroup] Group ${input.groupId} not found`);
         return {
           data: null,
           error: {
@@ -501,6 +505,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (groupToDelete.createdById !== ctx.userId) {
+        console.warn(
+          `[deleteGroup] User ${ctx.userId} not authorized to delete group ${input.groupId}`,
+        );
         return {
           data: null,
           error: {
@@ -513,21 +520,19 @@ export const groupRouter = createTRPCRouter({
 
       const { data, error } = await withCatch(async () => {
         if (input.hard !== true) {
-          console.log("Soft deleting group:", groupToDelete.id);
           return await ctx.db.group.update({
             where: { id: input.groupId },
             data: { deletedAt: new Date() },
           });
         }
 
-        console.log("Hard deleting group:", groupToDelete.id);
         return await ctx.db.group.delete({
           where: { id: input.groupId },
         });
       });
 
       if (error !== null) {
-        console.error("Error deleting group:", error);
+        console.error(`[deleteGroup] Failed to delete group ${input.groupId}:`, error);
         return {
           data: null,
           error: {
@@ -537,14 +542,14 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      console.log("Group deleted successfully:", data.id);
-
+      console.log(`[deleteGroup] Deleted group ${data.id}`);
       return { data: "Group deleted successfully", error: null };
     }),
 
   restoreGroup: protectedProcedure
     .input(restoreGroupSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      console.log(`[restoreGroup] User ${ctx.userId} restoring group ${input.groupId}`);
       const { data: group, error: fetchError } = await withCatch(async () => {
         return await ctx.db.group.findFirst({
           where: { id: input.groupId, deletedAt: { not: null } },
@@ -552,7 +557,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (fetchError !== null) {
-        console.error("Error fetching group for restore:", fetchError);
+        console.error(`[restoreGroup] Failed to fetch group ${input.groupId}:`, fetchError);
         return {
           data: null,
           error: {
@@ -563,6 +568,7 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!group) {
+        console.warn(`[restoreGroup] No deleted group found for id ${input.groupId}`);
         return {
           data: null,
           error: { message: "No deleted group found to restore.", code: "NOT_FOUND" },
@@ -570,6 +576,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (group.createdById !== ctx.userId) {
+        console.warn(
+          `[restoreGroup] User ${ctx.userId} not authorized to restore group ${input.groupId}`,
+        );
         return {
           data: null,
           error: {
@@ -587,7 +596,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (restoreError !== null) {
-        console.error("Error restoring group:", restoreError);
+        console.error(`[restoreGroup] Failed to restore group ${input.groupId}:`, restoreError);
         return {
           data: null,
           error: {
@@ -597,12 +606,14 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(`[restoreGroup] Restored group ${input.groupId}`);
       return { data: "Group restored successfully", error: null };
     }),
 
   updateGroup: groupAdminProcedure
     .input(updateGroupSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      console.log(`[updateGroup] User ${ctx.userId} updating group ${input.groupId}`);
       const { error: updateError } = await withCatch(async () => {
         return await ctx.db.group.update({
           where: { id: input.groupId, deletedAt: null },
@@ -614,7 +625,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (updateError !== null) {
-        console.error("Error updating group:", updateError);
+        console.error(`[updateGroup] Failed for group ${input.groupId}:`, updateError);
         return {
           data: null,
           error: {
@@ -624,14 +635,18 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(`[updateGroup] Updated group ${input.groupId}`);
       return { data: "Group updated successfully", error: null };
     }),
 
   updateMemberRole: groupAdminProcedure
     .input(updateMemberRoleSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
-      // Cannot change your own role
+      console.log(
+        `[updateMemberRole] User ${ctx.userId} setting member ${input.memberId} isAdmin=${input.isAdmin} in group ${input.groupId}`,
+      );
       if (input.memberId === ctx.userId) {
+        console.warn(`[updateMemberRole] User ${ctx.userId} tried to change own role`);
         return {
           data: null,
           error: { message: "You cannot change your own role.", code: "BAD_REQUEST" },
@@ -644,6 +659,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (groupError !== null || !group) {
+        console.warn(`[updateMemberRole] Group ${input.groupId} not found`);
         return {
           data: null,
           error: { message: "Group not found.", code: "NOT_FOUND" },
@@ -651,6 +667,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (input.memberId === group.createdById && !input.isAdmin) {
+        console.warn(
+          `[updateMemberRole] Cannot demote group owner ${input.memberId} in group ${input.groupId}`,
+        );
         return {
           data: null,
           error: { message: "The group owner cannot be demoted.", code: "FORBIDDEN" },
@@ -666,7 +685,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (fetchError !== null) {
-        console.error("Error fetching member:", fetchError);
+        console.error(`[updateMemberRole] Failed to fetch member ${input.memberId}:`, fetchError);
         return {
           data: null,
           error: {
@@ -677,6 +696,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!member || member.deletedAt !== null) {
+        console.warn(
+          `[updateMemberRole] Member ${input.memberId} not found in group ${input.groupId}`,
+        );
         return {
           data: null,
           error: { message: "Member not found in this group.", code: "NOT_FOUND" },
@@ -684,6 +706,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (member.status !== "JOINED") {
+        console.warn(
+          `[updateMemberRole] Member ${input.memberId} status is ${member.status}, not JOINED`,
+        );
         return {
           data: null,
           error: { message: "Can only change roles for joined members.", code: "BAD_REQUEST" },
@@ -698,7 +723,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (updateError !== null) {
-        console.error("Error updating member role:", updateError);
+        console.error(
+          `[updateMemberRole] Failed for member ${input.memberId} in group ${input.groupId}:`,
+          updateError,
+        );
         return {
           data: null,
           error: {
@@ -708,6 +736,9 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(
+        `[updateMemberRole] Member ${input.memberId} ${input.isAdmin ? "promoted to admin" : "demoted to member"} in group ${input.groupId}`,
+      );
       return {
         data: `Member ${input.isAdmin ? "promoted to admin" : "demoted to member"} successfully`,
         error: null,
@@ -717,7 +748,9 @@ export const groupRouter = createTRPCRouter({
   inviteUser: groupMemberProcedure
     .input(inviteMemberSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
-      // Group membership is verified by middleware
+      console.log(
+        `[inviteUser] User ${ctx.userId} inviting ${input.inviteeUserId} to group ${input.groupId}, role=${input.role}`,
+      );
 
       // If assigning admin role, verify the inviter is an admin or creator
       if (input.role === "admin") {
@@ -734,6 +767,7 @@ export const groupRouter = createTRPCRouter({
         });
 
         if (inviterError !== null) {
+          console.error(`[inviteUser] Failed to check inviter permissions:`, inviterError);
           return {
             data: null,
             error: { message: "An error occurred.", code: "INTERNAL_SERVER_ERROR" },
@@ -741,6 +775,7 @@ export const groupRouter = createTRPCRouter({
         }
 
         if (!inviter) {
+          console.warn(`[inviteUser] Non-admin user ${ctx.userId} tried to assign admin role`);
           return {
             data: null,
             error: { message: "Only admins can assign the admin role.", code: "FORBIDDEN" },
@@ -749,6 +784,9 @@ export const groupRouter = createTRPCRouter({
 
         const isGroupAdmin = inviter.isAdmin || inviter.group.createdById === ctx.userId;
         if (!isGroupAdmin) {
+          console.warn(
+            `[inviteUser] User ${ctx.userId} is not admin, cannot assign admin role in group ${input.groupId}`,
+          );
           return {
             data: null,
             error: { message: "Only admins can assign the admin role.", code: "FORBIDDEN" },
@@ -764,7 +802,10 @@ export const groupRouter = createTRPCRouter({
       );
 
       if (isAlreadyJoinedError !== null) {
-        console.error("Error checking if user is already joined:", isAlreadyJoinedError);
+        console.error(
+          `[inviteUser] Failed to check membership for user ${input.inviteeUserId}:`,
+          isAlreadyJoinedError,
+        );
         return {
           data: null,
           error: isAlreadyJoinedError,
@@ -772,7 +813,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (isAlreadyJoined) {
-        console.warn("User is already a member of the group:", input.inviteeUserId);
+        console.warn(
+          `[inviteUser] User ${input.inviteeUserId} already joined group ${input.groupId}`,
+        );
         return {
           data: null,
           error: {
@@ -790,7 +833,10 @@ export const groupRouter = createTRPCRouter({
       );
 
       if (isAlreadyInvitedError !== null) {
-        console.error("Error checking if user is already invited:", isAlreadyInvitedError);
+        console.error(
+          `[inviteUser] Failed to check invite status for user ${input.inviteeUserId}:`,
+          isAlreadyInvitedError,
+        );
         return {
           data: null,
           error: isAlreadyInvitedError,
@@ -798,7 +844,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (isAlreadyInvited) {
-        console.warn("User is already invited to the group:", input.inviteeUserId);
+        console.warn(
+          `[inviteUser] User ${input.inviteeUserId} already invited to group ${input.groupId}`,
+        );
         return {
           data: null,
           error: {
@@ -820,7 +868,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (userExistsError !== null) {
-        console.error("Error checking if user exists:", userExistsError);
+        console.error(
+          `[inviteUser] Failed to verify user ${input.inviteeUserId} exists:`,
+          userExistsError,
+        );
         return {
           data: null,
           error: {
@@ -831,7 +882,7 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!userExists) {
-        console.warn("User to be invited does not exist:", input.inviteeUserId);
+        console.warn(`[inviteUser] User ${input.inviteeUserId} does not exist`);
         return {
           data: null,
           error: {
@@ -840,8 +891,6 @@ export const groupRouter = createTRPCRouter({
           },
         };
       }
-
-      console.log("Inviting user to group:", input.inviteeUserId, "by", ctx.userId);
 
       const { error: inviteUserError } = await withCatch(async () => {
         return await ctx.db.groupMember.create({
@@ -856,7 +905,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (inviteUserError !== null) {
-        console.error("Error inviting user to group:", inviteUserError);
+        console.error(
+          `[inviteUser] Failed to invite user ${input.inviteeUserId} to group ${input.groupId}:`,
+          inviteUserError,
+        );
         return {
           data: null,
           error: {
@@ -865,7 +917,7 @@ export const groupRouter = createTRPCRouter({
           },
         };
       }
-      console.log("User invited to group successfully:", input.inviteeUserId);
+      console.log(`[inviteUser] Invited user ${input.inviteeUserId} to group ${input.groupId}`);
 
       return { data: "User invited successfully", error: null };
     }),
@@ -875,8 +927,10 @@ export const groupRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
       const groupId = input.groupId;
       const targetUserId = input.userId;
+      console.log(
+        `[uninviteUser] User ${ctx.userId} revoking invite for ${targetUserId} in group ${groupId}`,
+      );
 
-      // Find the invited member
       const { data: invitedMember, error: findError } = await withCatch(async () => {
         return await ctx.db.groupMember.findFirst({
           where: {
@@ -889,6 +943,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (findError !== null) {
+        console.error(
+          `[uninviteUser] Failed to find invite for ${targetUserId} in group ${groupId}:`,
+          findError,
+        );
         return {
           data: null,
           error: { message: "An error occurred.", code: "INTERNAL_SERVER_ERROR" },
@@ -896,6 +954,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!invitedMember) {
+        console.warn(
+          `[uninviteUser] No pending invite for user ${targetUserId} in group ${groupId}`,
+        );
         return {
           data: null,
           error: { message: "No pending invite found for this user.", code: "NOT_FOUND" },
@@ -910,6 +971,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (deleteError !== null) {
+        console.error(
+          `[uninviteUser] Failed to revoke invite for ${targetUserId} in group ${groupId}:`,
+          deleteError,
+        );
         return {
           data: null,
           error: {
@@ -919,6 +984,7 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(`[uninviteUser] Revoked invite for user ${targetUserId} in group ${groupId}`);
       return { data: "Invite revoked successfully", error: null };
     }),
 
@@ -927,6 +993,9 @@ export const groupRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
       const groupId = input.groupId;
       const targetUserId = input.userId;
+      console.log(
+        `[restoreInvite] User ${ctx.userId} restoring invite for ${targetUserId} in group ${groupId}`,
+      );
 
       // Check if already a member or has a pending invite
       const { data: existingMember, error: findError } = await withCatch(async () => {
@@ -936,6 +1005,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (findError !== null) {
+        console.error(
+          `[restoreInvite] Failed to check membership for ${targetUserId} in group ${groupId}:`,
+          findError,
+        );
         return {
           data: null,
           error: { message: "An error occurred.", code: "INTERNAL_SERVER_ERROR" },
@@ -943,6 +1016,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (existingMember) {
+        console.warn(
+          `[restoreInvite] User ${targetUserId} already has active membership or invite in group ${groupId}`,
+        );
         return {
           data: null,
           error: {
@@ -966,6 +1042,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (createError !== null) {
+        console.error(
+          `[restoreInvite] Failed to restore invite for ${targetUserId} in group ${groupId}:`,
+          createError,
+        );
         return {
           data: null,
           error: {
@@ -975,12 +1055,14 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(`[restoreInvite] Restored invite for user ${targetUserId} in group ${groupId}`);
       return { data: "Invite restored successfully", error: null };
     }),
 
   acceptInvite: protectedProcedure
     .input(z.object({ groupMemberId: z.number() }))
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      console.log(`[acceptInvite] User ${ctx.userId} accepting invite ${input.groupMemberId}`);
       const { data: existingInvite, error: existingInviteError } = await withCatch(async () => {
         return await ctx.db.groupMember.findUnique({
           where: { id: input.groupMemberId, deletedAt: null },
@@ -988,7 +1070,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (existingInviteError !== null) {
-        console.error("Error fetching existing invite:", existingInviteError);
+        console.error(
+          `[acceptInvite] Failed to fetch invite ${input.groupMemberId}:`,
+          existingInviteError,
+        );
         return {
           data: null,
           error: {
@@ -999,7 +1084,7 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!existingInvite) {
-        console.warn("Invite not found for ID:", input.groupMemberId);
+        console.warn(`[acceptInvite] Invite ${input.groupMemberId} not found`);
         return {
           data: null,
           error: {
@@ -1010,6 +1095,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (existingInvite.memberId !== ctx.userId) {
+        console.warn(
+          `[acceptInvite] User ${ctx.userId} tried to accept invite ${input.groupMemberId} belonging to another user`,
+        );
         return {
           data: null,
           error: {
@@ -1020,6 +1108,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (existingInvite.status !== "INVITED") {
+        console.warn(
+          `[acceptInvite] Invite ${input.groupMemberId} already responded to, status=${existingInvite.status}`,
+        );
         return {
           data: null,
           error: {
@@ -1039,7 +1130,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (error !== null) {
-        console.error("Error accepting group invite:", error);
+        console.error(`[acceptInvite] Failed to accept invite ${input.groupMemberId}:`, error);
         return {
           data: null,
           error: {
@@ -1049,12 +1140,14 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(`[acceptInvite] User ${ctx.userId} accepted invite ${input.groupMemberId}`);
       return { data: "Invite accepted successfully", error: null };
     }),
 
   declineInvite: protectedProcedure
     .input(z.object({ groupMemberId: z.number() }))
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      console.log(`[declineInvite] User ${ctx.userId} declining invite ${input.groupMemberId}`);
       const { data: existingInvite, error: fetchError } = await withCatch(async () => {
         return await ctx.db.groupMember.findUnique({
           where: { id: input.groupMemberId, deletedAt: null },
@@ -1062,7 +1155,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (fetchError !== null) {
-        console.error("Error fetching invite:", fetchError);
+        console.error(`[declineInvite] Failed to fetch invite ${input.groupMemberId}:`, fetchError);
         return {
           data: null,
           error: {
@@ -1073,6 +1166,7 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!existingInvite) {
+        console.warn(`[declineInvite] Invite ${input.groupMemberId} not found`);
         return {
           data: null,
           error: { message: "Invite not found", code: "NOT_FOUND" },
@@ -1080,6 +1174,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (existingInvite.memberId !== ctx.userId) {
+        console.warn(
+          `[declineInvite] User ${ctx.userId} tried to decline invite ${input.groupMemberId} belonging to another user`,
+        );
         return {
           data: null,
           error: {
@@ -1090,6 +1187,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (existingInvite.status !== "INVITED") {
+        console.warn(
+          `[declineInvite] Invite ${input.groupMemberId} already responded to, status=${existingInvite.status}`,
+        );
         return {
           data: null,
           error: {
@@ -1106,7 +1206,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (error !== null) {
-        console.error("Error declining invite:", error);
+        console.error(`[declineInvite] Failed to decline invite ${input.groupMemberId}:`, error);
         return {
           data: null,
           error: {
@@ -1116,13 +1216,20 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(`[declineInvite] User ${ctx.userId} declined invite ${input.groupMemberId}`);
       return { data: "Invite declined successfully", error: null };
     }),
 
   createTransaction: groupMemberProcedure
     .input(createTransactionSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      console.log(
+        `[createTransaction] User ${ctx.userId} creating transaction in group ${input.groupId}, amount=${input.amount}`,
+      );
       if (!verifyTransactionDetails(input.amount, input.transactionDetails, input.payerId)) {
+        console.warn(
+          `[createTransaction] Invalid details for group ${input.groupId}: amount=${input.amount}, splits=${input.transactionDetails.length}, payerId=${input.payerId}`,
+        );
         return {
           data: null,
           error: {
@@ -1179,7 +1286,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (transactionError !== null) {
-        console.error("Error creating transaction:", transactionError);
+        console.error(`[createTransaction] Failed in group ${input.groupId}:`, transactionError);
         return {
           data: null,
           error: {
@@ -1189,13 +1296,20 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(
+        `[createTransaction] Created transaction ${transaction.id} in group ${input.groupId}`,
+      );
       return { data: "Transaction created successfully", error: null };
     }),
 
   createSettlement: groupMemberProcedure
     .input(createSettlementSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      console.log(
+        `[createSettlement] User ${ctx.userId} recording settlement in group ${input.groupId}, amount=${input.amount}`,
+      );
       if (input.payerId === input.recipientId) {
+        console.warn(`[createSettlement] User ${input.payerId} tried to settle with self`);
         return {
           data: null,
           error: { message: "Cannot settle up with yourself.", code: "BAD_REQUEST" },
@@ -1204,6 +1318,7 @@ export const groupRouter = createTRPCRouter({
 
       // Only the payer or recipient can record a settlement
       if (ctx.userId !== input.payerId && ctx.userId !== input.recipientId) {
+        console.warn(`[createSettlement] User ${ctx.userId} is neither payer nor recipient`);
         return {
           data: null,
           error: {
@@ -1249,7 +1364,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (transactionError !== null) {
-        console.error("Error creating settlement:", transactionError);
+        console.error(`[createSettlement] Failed in group ${input.groupId}:`, transactionError);
         return {
           data: null,
           error: {
@@ -1259,13 +1374,17 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(`[createSettlement] Recorded settlement in group ${input.groupId}`);
       return { data: "Settlement recorded successfully", error: null };
     }),
 
   updateTransaction: groupMemberProcedure
     .input(updateTransactionSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
-      // Fetch existing transaction to check permissions
+      console.log(
+        `[updateTransaction] User ${ctx.userId} updating transaction ${input.transactionId} in group ${input.groupId}`,
+      );
+
       const { data: existingTransaction, error: fetchError } = await withCatch(async () => {
         return await ctx.db.transaction.findFirst({
           where: { id: input.transactionId, groupId: input.groupId, deletedAt: null },
@@ -1273,7 +1392,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (fetchError !== null) {
-        console.error("Error fetching transaction:", fetchError);
+        console.error(
+          `[updateTransaction] Failed to fetch transaction ${input.transactionId}:`,
+          fetchError,
+        );
         return {
           data: null,
           error: {
@@ -1284,14 +1406,17 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!existingTransaction) {
+        console.warn(
+          `[updateTransaction] Transaction ${input.transactionId} not found in group ${input.groupId}`,
+        );
         return {
           data: null,
           error: { message: "Transaction not found.", code: "NOT_FOUND" },
         };
       }
 
-      // Cannot edit settlements through this route
       if (existingTransaction.isSettlement) {
+        console.warn(`[updateTransaction] Cannot edit settlement ${input.transactionId}`);
         return {
           data: null,
           error: {
@@ -1312,6 +1437,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!verifyTransactionDetails(input.amount, input.transactionDetails, input.payerId)) {
+        console.warn(
+          `[updateTransaction] Invalid details for transaction ${input.transactionId}: amount=${input.amount}, splits=${input.transactionDetails.length}, payerId=${input.payerId}`,
+        );
         return {
           data: null,
           error: {
@@ -1368,7 +1496,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (updateError !== null) {
-        console.error("Error updating transaction:", updateError);
+        console.error(
+          `[updateTransaction] Failed to update transaction ${input.transactionId}:`,
+          updateError,
+        );
         return {
           data: null,
           error: {
@@ -1378,12 +1509,18 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(
+        `[updateTransaction] Updated transaction ${input.transactionId} in group ${input.groupId}`,
+      );
       return { data: "Transaction updated successfully", error: null };
     }),
 
   deleteTransaction: groupMemberProcedure
     .input(deleteTransactionSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      console.log(
+        `[deleteTransaction] User ${ctx.userId} deleting transaction ${input.transactionId} in group ${input.groupId}`,
+      );
       const { data: transaction, error: fetchError } = await withCatch(async () => {
         return await ctx.db.transaction.findFirst({
           where: { id: input.transactionId, groupId: input.groupId, deletedAt: null },
@@ -1391,7 +1528,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (fetchError !== null) {
-        console.error("Error fetching transaction:", fetchError);
+        console.error(
+          `[deleteTransaction] Failed to fetch transaction ${input.transactionId}:`,
+          fetchError,
+        );
         return {
           data: null,
           error: {
@@ -1402,6 +1542,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!transaction) {
+        console.warn(
+          `[deleteTransaction] Transaction ${input.transactionId} not found in group ${input.groupId}`,
+        );
         return {
           data: null,
           error: { message: "Transaction not found.", code: "NOT_FOUND" },
@@ -1425,7 +1568,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (deleteError !== null) {
-        console.error("Error deleting transaction:", deleteError);
+        console.error(
+          `[deleteTransaction] Failed to delete transaction ${input.transactionId}:`,
+          deleteError,
+        );
         return {
           data: null,
           error: {
@@ -1435,12 +1581,18 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(
+        `[deleteTransaction] Deleted transaction ${input.transactionId} in group ${input.groupId}`,
+      );
       return { data: "Transaction deleted successfully", error: null };
     }),
 
   restoreTransaction: groupMemberProcedure
     .input(restoreTransactionSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      console.log(
+        `[restoreTransaction] User ${ctx.userId} restoring transaction ${input.transactionId} in group ${input.groupId}`,
+      );
       const { data: transaction, error: fetchError } = await withCatch(async () => {
         return await ctx.db.transaction.findFirst({
           where: { id: input.transactionId, groupId: input.groupId, deletedAt: { not: null } },
@@ -1448,7 +1600,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (fetchError !== null) {
-        console.error("Error fetching transaction:", fetchError);
+        console.error(
+          `[restoreTransaction] Failed to fetch transaction ${input.transactionId}:`,
+          fetchError,
+        );
         return {
           data: null,
           error: {
@@ -1459,6 +1614,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (!transaction) {
+        console.warn(
+          `[restoreTransaction] No deleted transaction ${input.transactionId} found in group ${input.groupId}`,
+        );
         return {
           data: null,
           error: { message: "No deleted transaction found to restore.", code: "NOT_FOUND" },
@@ -1482,7 +1640,10 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (restoreError !== null) {
-        console.error("Error restoring transaction:", restoreError);
+        console.error(
+          `[restoreTransaction] Failed to restore transaction ${input.transactionId}:`,
+          restoreError,
+        );
         return {
           data: null,
           error: {
@@ -1492,6 +1653,9 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
+      console.log(
+        `[restoreTransaction] Restored transaction ${input.transactionId} in group ${input.groupId}`,
+      );
       return { data: "Transaction restored successfully", error: null };
     }),
 
@@ -1504,25 +1668,35 @@ export const groupRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }): Promise<ApiResponse<UploadResult>> => {
+      console.log(
+        `[uploadReceipt] User ${ctx.userId} uploading receipt for group ${input.groupId}, file="${input.fileName}"`,
+      );
       const { data: result, error: uploadError } = await withCatch(async () => {
         return await storageService.getUploadUrl(input.fileName, input.mimeType);
       });
 
       if (uploadError !== null) {
-        console.error("Error getting upload URL:", uploadError);
+        console.error(
+          `[uploadReceipt] Failed to get upload URL for group ${input.groupId}:`,
+          uploadError,
+        );
         return {
           data: null,
           error: { message: "Failed to prepare receipt upload.", code: "INTERNAL_SERVER_ERROR" },
         };
       }
 
+      console.log(`[uploadReceipt] Generated upload URL for group ${input.groupId}`);
       return { data: result, error: null };
     }),
 
   getDetailedBalances: groupMemberProcedure
     .input(z.object({ groupId: z.number() }))
     .query(async ({ ctx, input }): Promise<ApiResponse<BalanceCalculationResult>> => {
-      // Fetch all transactions for the group
+      console.log(
+        `[getDetailedBalances] User ${ctx.userId} fetching balances for group ${input.groupId}`,
+      );
+
       const { data: transactions, error: transactionError } = await withCatch(async () => {
         return await ctx.db.transaction.findMany({
           where: {
@@ -1536,7 +1710,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (transactionError !== null) {
-        console.error("Error fetching transactions:", transactionError);
+        console.error(`[getDetailedBalances] Failed for group ${input.groupId}:`, transactionError);
         return {
           data: null,
           error: {
@@ -1546,19 +1720,20 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      // Transform transactions to match our helper function signature
       const transformedTransactions = transactions.map((transaction) => ({
         payerId: transaction.payerId,
-        amount: transaction.amount.toNumber(), // Convert Decimal to number
+        amount: transaction.amount.toNumber(),
         transactionDetails: transaction.transactionDetails.map((detail) => ({
           recipientId: detail.recipientId,
-          amount: detail.amount.toNumber(), // Convert Decimal to number
+          amount: detail.amount.toNumber(),
         })),
       }));
 
-      // Calculate balances using helper method
       const balanceData = calculateGroupBalances(transformedTransactions);
 
+      console.log(
+        `[getDetailedBalances] Calculated balances for group ${input.groupId}, ${Object.keys(balanceData.userBalances).length} users`,
+      );
       return {
         data: balanceData,
         error: null,
@@ -1568,9 +1743,10 @@ export const groupRouter = createTRPCRouter({
   getSimpleBalances: groupMemberProcedure
     .input(z.object({ groupId: z.number() }))
     .query(async ({ ctx, input }): Promise<ApiResponse<Record<string, UserBalance>>> => {
-      // Group membership is verified by middleware
+      console.log(
+        `[getSimpleBalances] User ${ctx.userId} fetching balances for group ${input.groupId}`,
+      );
 
-      // Fetch all transactions for the group
       const { data: transactions, error: transactionError } = await withCatch(async () => {
         return await ctx.db.transaction.findMany({
           where: {
@@ -1584,7 +1760,7 @@ export const groupRouter = createTRPCRouter({
       });
 
       if (transactionError !== null) {
-        console.error("Error fetching transactions:", transactionError);
+        console.error(`[getSimpleBalances] Failed for group ${input.groupId}:`, transactionError);
         return {
           data: null,
           error: {
@@ -1594,19 +1770,20 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      // Transform transactions to match our helper function signature
       const transformedTransactions = transactions.map((transaction) => ({
         payerId: transaction.payerId,
-        amount: transaction.amount.toNumber(), // Convert Decimal to number
+        amount: transaction.amount.toNumber(),
         transactionDetails: transaction.transactionDetails.map((detail) => ({
           recipientId: detail.recipientId,
-          amount: detail.amount.toNumber(), // Convert Decimal to number
+          amount: detail.amount.toNumber(),
         })),
       }));
 
-      // Calculate balances using helper method and return just the user balances
       const balanceData = calculateGroupBalances(transformedTransactions);
 
+      console.log(
+        `[getSimpleBalances] Calculated balances for group ${input.groupId}, ${Object.keys(balanceData.userBalances).length} users`,
+      );
       return {
         data: balanceData.userBalances,
         error: null,
