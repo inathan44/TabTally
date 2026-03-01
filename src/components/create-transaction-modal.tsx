@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
@@ -39,7 +39,11 @@ import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import type { GroupMember } from "~/server/contracts/groups";
-import { createTransactionFormSchema, transactionCategories, transactionCategoryLabels } from "~/server/contracts/groups";
+import {
+  createTransactionFormSchema,
+  transactionCategories,
+  transactionCategoryLabels,
+} from "~/server/contracts/groups";
 import type { SafeTransaction } from "~/server/contracts/transactions";
 import { AnimatedButton } from "./ui/animated-button";
 import { useReceiptUpload } from "~/hooks/use-receipt-upload";
@@ -90,7 +94,7 @@ export default function CreateTransactionModal({
     : {
         amount: "",
         description: "",
-        category: null as typeof transactionCategories[number] | null,
+        category: null as (typeof transactionCategories)[number] | null,
         payerId: "",
         transactionDate: new Date(),
         splits: [] as { recipientId: string; amount: string }[],
@@ -104,6 +108,7 @@ export default function CreateTransactionModal({
   const createTransactionMutation = api.group.createTransaction.useMutation();
   const updateTransactionMutation = api.group.updateTransaction.useMutation();
   const activeMutation = isEditMode ? updateTransactionMutation : createTransactionMutation;
+  const formRef = useRef<HTMLFormElement>(null);
 
   const { fields, replace, append, remove } = useFieldArray({
     control: form.control,
@@ -137,6 +142,7 @@ export default function CreateTransactionModal({
   };
 
   const selectAll = () => {
+    const scrollTop = formRef.current?.scrollTop ?? 0;
     const currentSplits = form.getValues("splits");
     const allSelected = groupMembers.every((m) => selectedMemberIds.has(m.id));
     if (allSelected) {
@@ -148,6 +154,10 @@ export default function CreateTransactionModal({
       });
       replace(newSplits);
     }
+    // Restore scroll position after React re-renders the split rows
+    requestAnimationFrame(() => {
+      if (formRef.current) formRef.current.scrollTop = scrollTop;
+    });
   };
 
   const equalSplit = () => {
@@ -261,12 +271,18 @@ export default function CreateTransactionModal({
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Transaction" : "Create New Transaction"}</DialogTitle>
           <DialogDescription>
-            {isEditMode ? "Update the transaction details" : "Add a new expense to split between group members"}
+            {isEditMode
+              ? "Update the transaction details"
+              : "Add a new expense to split between group members"}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="min-h-0 flex-1 space-y-6 overflow-y-auto">
+          <form
+            ref={formRef}
+            onSubmit={form.handleSubmit(handleSubmit)}
+            className="min-h-0 flex-1 space-y-6 overflow-y-auto"
+          >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
@@ -410,12 +426,10 @@ export default function CreateTransactionModal({
                   }}
                   className="hidden"
                 />
-                {receipt.error && (
-                  <p className="text-xs text-destructive">{receipt.error}</p>
-                )}
+                {receipt.error && <p className="text-destructive text-xs">{receipt.error}</p>}
                 {receipt.url ? (
-                  <div className="flex items-center gap-2 rounded-md border border-border p-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div className="border-border flex items-center gap-2 rounded-md border p-2">
+                    <FileText className="text-muted-foreground h-4 w-4" />
                     <span className="min-w-0 flex-1 truncate text-sm">
                       {receipt.file?.name ?? "Receipt attached"}
                     </span>
@@ -431,9 +445,9 @@ export default function CreateTransactionModal({
                     </Button>
                   </div>
                 ) : receipt.isPending ? (
-                  <div className="flex items-center gap-2 rounded-md border border-border p-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Uploading...</span>
+                  <div className="border-border flex items-center gap-2 rounded-md border p-2">
+                    <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+                    <span className="text-muted-foreground text-sm">Uploading...</span>
                   </div>
                 ) : (
                   <Button
@@ -461,7 +475,13 @@ export default function CreateTransactionModal({
                     {allSelected ? "Deselect All" : "Select All"}
                   </Button>
                   {fields.length > 0 && (
-                    <Button type="button" variant="outline" size="sm" onClick={equalSplit}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={equalSplit}
+                      disabled={!watchedAmount || parseFloat(watchedAmount) <= 0}
+                    >
                       Split Evenly
                     </Button>
                   )}
@@ -605,12 +625,11 @@ export default function CreateTransactionModal({
               <AnimatedButton
                 type="submit"
                 loading={activeMutation.isPending}
-                success={
-                  activeMutation.isSuccess && !activeMutation.data?.error
-                }
+                success={activeMutation.isSuccess && !activeMutation.data?.error}
                 successText={isEditMode ? "Transaction Updated!" : "Transaction Created!"}
                 disabled={
-                  activeMutation.isPending || (activeMutation.isSuccess && !activeMutation.data?.error)
+                  activeMutation.isPending ||
+                  (activeMutation.isSuccess && !activeMutation.data?.error)
                 }
                 className="min-w-[140px]"
               >
