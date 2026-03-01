@@ -22,6 +22,7 @@ interface SettleUpTarget {
   amount: number;
   toVenmoUsername: string | null;
   toCashappUsername: string | null;
+  toZelleUsername: string | null;
 }
 
 export default function BalancesTab({ group }: BalancesTabProps) {
@@ -128,6 +129,7 @@ export default function BalancesTab({ group }: BalancesTabProps) {
                         amount: settlement.amount,
                         toVenmoUsername: to.venmoUsername,
                         toCashappUsername: to.cashappUsername,
+                        toZelleUsername: to.zelleUsername,
                       })
                     }
                   >
@@ -231,6 +233,7 @@ export default function BalancesTab({ group }: BalancesTabProps) {
           suggestedAmount={settleTarget.amount}
           toVenmoUsername={settleTarget.toVenmoUsername}
           toCashappUsername={settleTarget.toCashappUsername}
+          toZelleUsername={settleTarget.toZelleUsername}
         />
       )}
     </div>

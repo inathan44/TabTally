@@ -42,6 +42,7 @@ export default function PaymentUsernamesForm() {
     values: {
       venmoUsername: profile?.venmoUsername ?? "",
       cashappUsername: profile?.cashappUsername ?? "",
+      zelleUsername: profile?.zelleUsername ?? "",
     },
   });
 
@@ -159,6 +160,25 @@ export default function PaymentUsernamesForm() {
                       "Your Cash App username"
                     )}
                   </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="zelleUsername"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Zelle</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="email or phone number"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormDescription>Your Zelle email or phone number</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

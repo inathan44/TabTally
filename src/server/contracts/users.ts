@@ -12,6 +12,7 @@ export type UserProfile = Pick<
   | "email"
   | "venmoUsername"
   | "cashappUsername"
+  | "zelleUsername"
   | "createdAt"
 >;
 
@@ -60,6 +61,7 @@ export const updateProfileSchema = z.object({
   username: usernameSchema.optional(),
   venmoUsername: paymentUsername,
   cashappUsername: paymentUsername,
+  zelleUsername: z.string().max(100).optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 

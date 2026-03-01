@@ -30,6 +30,7 @@ export const userRouter = createTRPCRouter({
             email: true,
             venmoUsername: true,
             cashappUsername: true,
+            zelleUsername: true,
             createdAt: true,
           },
         }),
@@ -58,6 +59,7 @@ export const userRouter = createTRPCRouter({
       const data: {
         venmoUsername?: string | null;
         cashappUsername?: string | null;
+        zelleUsername?: string | null;
         username?: string;
       } = {
         // Intentionally using || to coerce empty strings to null
@@ -65,6 +67,8 @@ export const userRouter = createTRPCRouter({
         venmoUsername: input.venmoUsername?.trim() || null,
         // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         cashappUsername: input.cashappUsername?.trim() || null,
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+        zelleUsername: input.zelleUsername?.trim() || null,
       };
 
       if (input.username) {

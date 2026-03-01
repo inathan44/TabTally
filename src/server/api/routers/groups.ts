@@ -162,6 +162,7 @@ export const groupRouter = createTRPCRouter({
                     createdAt: true,
                     venmoUsername: true,
                     cashappUsername: true,
+                    zelleUsername: true,
                   },
                 },
               },
@@ -285,6 +286,7 @@ export const groupRouter = createTRPCRouter({
               createdAt: true,
               venmoUsername: true,
               cashappUsername: true,
+              zelleUsername: true,
             },
           });
         });
@@ -943,7 +945,10 @@ export const groupRouter = createTRPCRouter({
       if (existingMember) {
         return {
           data: null,
-          error: { message: "User already has an active membership or invite.", code: "BAD_REQUEST" },
+          error: {
+            message: "User already has an active membership or invite.",
+            code: "BAD_REQUEST",
+          },
         };
       }
 

@@ -178,6 +178,7 @@ export type GroupMember = SafeUser & {
   status: GroupMemberStatus | "LEFT";
   venmoUsername: string | null;
   cashappUsername: string | null;
+  zelleUsername: string | null;
 };
 
 export type GetGroupResponse = SafeGroup & {

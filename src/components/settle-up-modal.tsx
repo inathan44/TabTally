@@ -54,6 +54,7 @@ interface SettleUpModalProps {
   suggestedAmount: number;
   toVenmoUsername: string | null;
   toCashappUsername: string | null;
+  toZelleUsername: string | null;
 }
 
 export default function SettleUpModal({
@@ -68,6 +69,7 @@ export default function SettleUpModal({
   suggestedAmount,
   toVenmoUsername,
   toCashappUsername,
+  toZelleUsername,
 }: SettleUpModalProps) {
   const utils = api.useUtils();
   const [error, setError] = useState<string | null>(null);
@@ -174,17 +176,15 @@ export default function SettleUpModal({
               )}
             />
 
-            {(toVenmoUsername ?? toCashappUsername) && (
+            {(toVenmoUsername ?? toCashappUsername ?? toZelleUsername) && (
               <div className="space-y-2">
                 <p className="text-muted-foreground text-xs font-medium">
                   Pay {toUserName.split(" ")[0]} directly
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {toVenmoUsername && (
                     <a
-                      href={`https://account.venmo.com/pay?recipients=${toVenmoUsername}&txn=pay${watchedAmount ? `&amount=${watchedAmount}` : ""}&note=${paymentNote}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href={`https://venmo.com/${toVenmoUsername}?txn=pay${watchedAmount ? `&amount=${watchedAmount}` : ""}&note=${paymentNote}`}
                       className="border-border bg-muted/30 text-foreground hover:bg-muted inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors"
                     >
                       Venmo @{toVenmoUsername}
@@ -193,14 +193,17 @@ export default function SettleUpModal({
                   )}
                   {toCashappUsername && (
                     <a
-                      href={`https://cash.app/$${toCashappUsername}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href={`https://cash.app/$${toCashappUsername}/${watchedAmount ?? ""}`}
                       className="border-border bg-muted/30 text-foreground hover:bg-muted inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors"
                     >
                       Cash App ${toCashappUsername}
                       <ExternalLink className="text-muted-foreground h-3 w-3" />
                     </a>
+                  )}
+                  {toZelleUsername && (
+                    <span className="border-border bg-muted/30 text-foreground inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium">
+                      Zelle: {toZelleUsername}
+                    </span>
                   )}
                 </div>
               </div>

@@ -15,6 +15,7 @@ model User {
   lastName       String    @db.VarChar(50)
   venmoUsername   String?   @db.VarChar(50)
   cashappUsername String?   @db.VarChar(50)
+  zelleUsername   String?   @db.VarChar(100)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
