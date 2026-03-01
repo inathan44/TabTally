@@ -69,20 +69,22 @@ export const restoreGroupSchema = z.object({
   groupId: groupId,
 });
 
-export const getGroupTransactionsSchema = z.object({
-  groupId: groupId,
-  search: z.string().optional(),
-  categories: z.array(z.enum(transactionCategories)).optional(),
-  payerIds: z.array(z.string()).optional(),
-  dateFrom: z.coerce.date().optional(),
-  dateTo: z.coerce.date().optional(),
-}).refine(
-  (data) => {
-    if (data.dateFrom && data.dateTo) return data.dateTo >= data.dateFrom;
-    return true;
-  },
-  { message: "End date must be on or after start date", path: ["dateTo"] },
-);
+export const getGroupTransactionsSchema = z
+  .object({
+    groupId: groupId,
+    search: z.string().optional(),
+    categories: z.array(z.enum(transactionCategories)).optional(),
+    payerIds: z.array(z.string()).optional(),
+    dateFrom: z.coerce.date().optional(),
+    dateTo: z.coerce.date().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.dateFrom && data.dateTo) return data.dateTo >= data.dateFrom;
+      return true;
+    },
+    { message: "End date must be on or after start date", path: ["dateTo"] },
+  );
 
 export const inviteMemberSchema = z.object({
   groupId: groupId,
@@ -174,6 +176,8 @@ type SafeGroup = Pick<Group, "id" | "name" | "slug" | "createdAt" | "createdById
 export type GroupMember = SafeUser & {
   isAdmin: boolean;
   status: GroupMemberStatus | "LEFT";
+  venmoUsername: string | null;
+  cashappUsername: string | null;
 };
 
 export type GetGroupResponse = SafeGroup & {
