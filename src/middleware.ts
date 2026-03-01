@@ -1,11 +1,21 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-type AppRoutes = "/" | "/sandbox" | "/sign-in" | "/sign-up" | "/api/trpc" | "/groups";
+type AppRoutes =
+  | "/"
+  | "/sandbox"
+  | "/sign-in"
+  | "/sign-up"
+  | "/api/trpc"
+  | "/groups"
+  | "/setup"
+  | "/profile";
 
-const protectedRoutes: AppRoutes[] = ["/api/trpc", "/sandbox", "/groups"];
+const protectedRoutes: AppRoutes[] = ["/api/trpc", "/sandbox", "/groups", "/setup", "/profile"];
 
 // Convert to route patterns (adding .* for sub-routes)
-const protectedRoutePatterns = protectedRoutes.map((route) => (route === "/api/trpc" ? "/api/trpc(.*)" : `${route}(.*)`));
+const protectedRoutePatterns = protectedRoutes.map((route) =>
+  route === "/api/trpc" ? "/api/trpc(.*)" : `${route}(.*)`,
+);
 
 const isProtectedRoute = createRouteMatcher(protectedRoutePatterns);
 

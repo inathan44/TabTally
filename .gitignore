@@ -49,3 +49,4 @@ yarn-error.log*
 seed.*
 agents.md
 .planned-features/
+.notes

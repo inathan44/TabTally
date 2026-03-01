@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { withCatch } from "~/lib/utils";
-
+import { containsProfanity } from "~/lib/profanity";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import type { ApiResponse } from "~/server/contracts/apiResponse";
 import type {
@@ -9,7 +9,11 @@ import type {
   SafeUser,
   UserProfile,
 } from "~/server/contracts/users";
-import { updatePaymentUsernamesSchema } from "~/server/contracts/users";
+import {
+  updateProfileSchema,
+  checkUsernameSchema,
+  searchUsersSchema,
+} from "~/server/contracts/users";
 import { calculateGroupBalances } from "~/server/helpers/balanceCalculation";
 
 export const userRouter = createTRPCRouter({
@@ -20,6 +24,7 @@ export const userRouter = createTRPCRouter({
           where: { id: ctx.userId, deletedAt: null },
           select: {
             id: true,
+            username: true,
             firstName: true,
             lastName: true,
             email: true,
@@ -47,27 +52,75 @@ export const userRouter = createTRPCRouter({
     return { data: user, error: null };
   }),
 
-  updatePaymentUsernames: protectedProcedure
-    .input(updatePaymentUsernamesSchema)
+  updateProfile: protectedProcedure
+    .input(updateProfileSchema)
     .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
-      const { error } = await withCatch(async () => {
-        return await ctx.db.user.update({
-          where: { id: ctx.userId },
-          data: {
-            venmoUsername: input.venmoUsername?.trim() || null,
-            cashappUsername: input.cashappUsername?.trim() || null,
-          },
-        });
-      });
+      const data: {
+        venmoUsername?: string | null;
+        cashappUsername?: string | null;
+        username?: string;
+      } = {
+        // Intentionally using || to coerce empty strings to null
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+        venmoUsername: input.venmoUsername?.trim() || null,
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+        cashappUsername: input.cashappUsername?.trim() || null,
+      };
+
+      if (input.username) {
+        if (containsProfanity(input.username)) {
+          return {
+            data: null,
+            error: { message: "That username is not allowed.", code: "BAD_REQUEST" },
+          };
+        }
+
+        // Intentionally not filtering by deletedAt — usernames must be globally unique to avoid conflicts with the DB unique constraint
+        const { data: existing, error: checkError } = await withCatch(
+          async () =>
+            await ctx.db.user.findFirst({
+              where: { username: { equals: input.username!, mode: "insensitive" } },
+              select: { id: true },
+            }),
+        );
+
+        if (checkError !== null) {
+          return {
+            data: null,
+            error: {
+              message: "An error occurred. Please try again.",
+              code: "INTERNAL_SERVER_ERROR",
+            },
+          };
+        }
+
+        if (existing && existing.id !== ctx.userId) {
+          return {
+            data: null,
+            error: { message: "That username is already taken.", code: "CONFLICT" },
+          };
+        }
+
+        data.username = input.username;
+      }
+
+      const { error } = await withCatch(
+        async () =>
+          await ctx.db.user.update({
+            where: { id: ctx.userId },
+            data,
+          }),
+      );
 
       if (error !== null) {
+        console.error("Error updating profile:", error);
         return {
           data: null,
-          error: { message: "Failed to update payment usernames.", code: "INTERNAL_SERVER_ERROR" },
+          error: { message: "Failed to update profile.", code: "INTERNAL_SERVER_ERROR" },
         };
       }
 
-      return { data: "Payment usernames updated successfully", error: null };
+      return { data: "Profile updated successfully", error: null };
     }),
 
   getUserById: protectedProcedure
@@ -86,6 +139,8 @@ export const userRouter = createTRPCRouter({
           data: null,
           error: {
             message:
+              // Intentionally using || to fallback on empty error messages
+              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
               error.message ||
               "An error occurred while getting user information. Please try again later.",
             code: "INTERNAL_SERVER_ERROR",
@@ -107,6 +162,7 @@ export const userRouter = createTRPCRouter({
       console.log("User found:", user.id);
       const safeUser: SafeUser = {
         id: user.id,
+        username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
         createdAt: user.createdAt,
@@ -138,6 +194,7 @@ export const userRouter = createTRPCRouter({
                   member: {
                     select: {
                       id: true,
+                      username: true,
                       firstName: true,
                       lastName: true,
                       createdAt: true,
@@ -208,6 +265,7 @@ export const userRouter = createTRPCRouter({
           createdById: group.createdById,
           groupUsers: group.members.map((member) => ({
             id: member.member.id,
+            username: member.member.username,
             firstName: member.member.firstName,
             lastName: member.member.lastName,
             createdAt: member.member.createdAt,
@@ -248,6 +306,7 @@ export const userRouter = createTRPCRouter({
               invitedBy: {
                 select: {
                   id: true,
+                  username: true,
                   firstName: true,
                   lastName: true,
                   createdAt: true,
@@ -283,55 +342,76 @@ export const userRouter = createTRPCRouter({
     },
   ),
 
-  searchUserByEmail: protectedProcedure
-    .input(z.object({ email: z.string() }))
-    .query(async ({ ctx, input }): Promise<ApiResponse<SafeUser>> => {
-      const email = input.email.trim().toLowerCase();
-      const { data: user, error } = await withCatch(
+  searchUsers: protectedProcedure
+    .input(searchUsersSchema)
+    .query(async ({ ctx, input }): Promise<ApiResponse<SafeUser[]>> => {
+      const query = input.query.trim().toLowerCase();
+      const isEmail = query.includes("@");
+
+      const { data: users, error } = await withCatch(
         async () =>
-          await ctx.db.user.findUnique({
+          await ctx.db.user.findMany({
             where: {
-              email: email,
               deletedAt: null,
+              id: { not: ctx.userId },
+              ...(isEmail
+                ? { email: { equals: query, mode: "insensitive" } }
+                : { username: { contains: query, mode: "insensitive" } }),
             },
             select: {
               id: true,
+              username: true,
               firstName: true,
               lastName: true,
               createdAt: true,
             },
+            take: 10,
+            orderBy: { username: "asc" },
           }),
       );
 
       if (error !== null) {
-        console.error("Error searching user by email:", error);
+        console.error("Error searching users:", error);
         return {
           data: null,
           error: {
-            message: "An error occurred while searching for users. Please try again later.",
+            message: "An error occurred while searching for users.",
             code: "INTERNAL_SERVER_ERROR",
           },
         };
       }
 
-      if (user === null || user.id === ctx.userId) {
-        console.warn("User not found for email:", email);
+      return { data: users, error: null };
+    }),
+
+  checkUsernameAvailability: protectedProcedure
+    .input(checkUsernameSchema)
+    .query(async ({ ctx, input }): Promise<ApiResponse<{ available: boolean }>> => {
+      const username = input.username;
+
+      if (containsProfanity(username)) {
         return {
           data: null,
-          error: {
-            message: "No user found with the provided email",
-            code: "NOT_FOUND",
-          },
+          error: { message: "That username is not allowed.", code: "BAD_REQUEST" },
         };
       }
 
-      const safeUser: SafeUser = {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        createdAt: user.createdAt,
-      };
+      // Intentionally not filtering by deletedAt — usernames must be globally unique to avoid conflicts with the DB unique constraint
+      const { data: existing, error } = await withCatch(
+        async () =>
+          await ctx.db.user.findFirst({
+            where: { username: { equals: username, mode: "insensitive" } },
+            select: { id: true },
+          }),
+      );
 
-      return { data: safeUser, error: null };
+      if (error !== null) {
+        return {
+          data: null,
+          error: { message: "An error occurred.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      return { data: { available: !existing }, error: null };
     }),
 });

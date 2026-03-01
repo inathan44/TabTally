@@ -2,7 +2,6 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { z } from "zod";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -18,9 +17,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ExternalLink } from "lucide-react";
 import { api } from "~/trpc/react";
-import { updatePaymentUsernamesSchema } from "~/server/contracts/users";
-
-type PaymentUsernamesFormValues = z.infer<typeof updatePaymentUsernamesSchema>;
+import { updateProfileSchema } from "~/server/contracts/users";
+import type { UpdateProfileInput } from "~/server/contracts/users";
 
 function getVenmoUrl(username: string): string | null {
   const cleaned = username.trim();
@@ -35,12 +33,12 @@ function getCashAppUrl(username: string): string | null {
 export default function PaymentUsernamesForm() {
   const { data: profileResult, isPending: profileLoading } = api.user.getProfile.useQuery();
   const utils = api.useUtils();
-  const mutation = api.user.updatePaymentUsernames.useMutation();
+  const mutation = api.user.updateProfile.useMutation();
 
   const profile = profileResult?.data;
 
-  const form = useForm<PaymentUsernamesFormValues>({
-    resolver: zodResolver(updatePaymentUsernamesSchema),
+  const form = useForm<UpdateProfileInput>({
+    resolver: zodResolver(updateProfileSchema),
     values: {
       venmoUsername: profile?.venmoUsername ?? "",
       cashappUsername: profile?.cashappUsername ?? "",
@@ -52,7 +50,7 @@ export default function PaymentUsernamesForm() {
   const venmoUrl = getVenmoUrl(watchedVenmo);
   const cashAppUrl = getCashAppUrl(watchedCashApp);
 
-  const onSubmit = async (data: PaymentUsernamesFormValues) => {
+  const onSubmit = async (data: UpdateProfileInput) => {
     const result = await mutation.mutateAsync(data);
     if (result.error) {
       toast.error(result.error.message);

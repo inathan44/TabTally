@@ -156,6 +156,7 @@ export const groupRouter = createTRPCRouter({
                 member: {
                   select: {
                     id: true,
+                    username: true,
                     firstName: true,
                     lastName: true,
                     createdAt: true,
@@ -174,6 +175,7 @@ export const groupRouter = createTRPCRouter({
                     recipient: {
                       select: {
                         id: true,
+                        username: true,
                         firstName: true,
                         lastName: true,
                         createdAt: true,
@@ -184,6 +186,7 @@ export const groupRouter = createTRPCRouter({
                 createdBy: {
                   select: {
                     id: true,
+                    username: true,
                     firstName: true,
                     lastName: true,
                     createdAt: true,
@@ -192,6 +195,7 @@ export const groupRouter = createTRPCRouter({
                 payer: {
                   select: {
                     id: true,
+                    username: true,
                     firstName: true,
                     lastName: true,
                     createdAt: true,
@@ -275,6 +279,7 @@ export const groupRouter = createTRPCRouter({
             where: { id: { in: formerMemberIds } },
             select: {
               id: true,
+              username: true,
               firstName: true,
               lastName: true,
               createdAt: true,
@@ -394,6 +399,7 @@ export const groupRouter = createTRPCRouter({
                 recipient: {
                   select: {
                     id: true,
+                    username: true,
                     firstName: true,
                     lastName: true,
                     createdAt: true,
@@ -404,6 +410,7 @@ export const groupRouter = createTRPCRouter({
             createdBy: {
               select: {
                 id: true,
+                username: true,
                 firstName: true,
                 lastName: true,
                 createdAt: true,
@@ -412,6 +419,7 @@ export const groupRouter = createTRPCRouter({
             payer: {
               select: {
                 id: true,
+                username: true,
                 firstName: true,
                 lastName: true,
                 createdAt: true,

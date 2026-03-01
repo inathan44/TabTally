@@ -3,7 +3,8 @@ type ErrorCodes =
   | "UNAUTHORIZED"
   | "FORBIDDEN"
   | "INTERNAL_SERVER_ERROR"
-  | "BAD_REQUEST";
+  | "BAD_REQUEST"
+  | "CONFLICT";
 
 type SuccessResponse<T> = {
   data: T;
@@ -20,6 +21,4 @@ type ErrorResponse<E = ErrObject> = {
   error: E;
 };
 
-export type ApiResponse<T, E = ErrObject> =
-  | SuccessResponse<T>
-  | ErrorResponse<E>;
+export type ApiResponse<T, E = ErrObject> = SuccessResponse<T> | ErrorResponse<E>;

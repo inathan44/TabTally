@@ -18,7 +18,11 @@ import { Form } from "~/components/ui/form";
 import { api } from "~/trpc/react";
 import { AnimatedButton } from "./ui/animated-button";
 import InviteUserPicker from "./user-email-search";
-import { inviteMembersFormSchema, type InviteMembersForm, type GroupMember } from "~/server/contracts/groups";
+import {
+  inviteMembersFormSchema,
+  type InviteMembersForm,
+  type GroupMember,
+} from "~/server/contracts/groups";
 
 interface InviteMemberModalProps {
   groupId: number;
@@ -26,7 +30,11 @@ interface InviteMemberModalProps {
   canAssignRoles?: boolean;
 }
 
-export default function InviteMemberModal({ groupId, existingMembers, canAssignRoles = false }: InviteMemberModalProps) {
+export default function InviteMemberModal({
+  groupId,
+  existingMembers,
+  canAssignRoles = false,
+}: InviteMemberModalProps) {
   const utils = api.useUtils();
   const [open, setOpen] = useState(false);
 
@@ -77,15 +85,19 @@ export default function InviteMemberModal({ groupId, existingMembers, canAssignR
             <UserPlus className="h-5 w-5" />
             Invite Members
           </DialogTitle>
-          <DialogDescription>Search by email to invite people to this group.</DialogDescription>
+          <DialogDescription>
+            Search by username or email to invite people to this group.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
             {(inviteMutation.data?.error ?? inviteMutation.error) && (
-              <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3">
-                <p className="text-sm text-destructive">
-                  {inviteMutation.data?.error?.message ?? inviteMutation.error?.message ?? "An unexpected error occurred."}
+              <div className="border-destructive/20 bg-destructive/5 rounded-md border p-3">
+                <p className="text-destructive text-sm">
+                  {inviteMutation.data?.error?.message ??
+                    inviteMutation.error?.message ??
+                    "An unexpected error occurred."}
                 </p>
               </div>
             )}
@@ -94,7 +106,9 @@ export default function InviteMemberModal({ groupId, existingMembers, canAssignR
               form={form}
               fieldName="invitedUsers"
               canAssignRoles={canAssignRoles}
-              isDisabled={(user) => existingMembers.some((m) => m.id === user.id && m.status !== "LEFT")}
+              isDisabled={(user) =>
+                existingMembers.some((m) => m.id === user.id && m.status !== "LEFT")
+              }
               disabledLabel={(user) => {
                 const member = existingMembers.find((m) => m.id === user.id);
                 return member?.status === "INVITED" ? "Already invited" : "Already a member";
