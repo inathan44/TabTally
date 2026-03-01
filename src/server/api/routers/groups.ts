@@ -793,57 +793,6 @@ export const groupRouter = createTRPCRouter({
 
       console.log("Inviting user to group:", input.inviteeUserId, "by", ctx.userId);
 
-      // Check for a previously soft-deleted invite and restore it
-      const { data: deletedInvite, error: deletedInviteError } = await withCatch(async () => {
-        return await ctx.db.groupMember.findFirst({
-          where: {
-            groupId: input.groupId,
-            memberId: input.inviteeUserId,
-            deletedAt: { not: null },
-          },
-        });
-      });
-
-      if (deletedInviteError !== null) {
-        console.error("Error checking for deleted invite:", deletedInviteError);
-        return {
-          data: null,
-          error: {
-            message: "An error occurred while inviting the user.",
-            code: "INTERNAL_SERVER_ERROR",
-          },
-        };
-      }
-
-      if (deletedInvite) {
-        // Restore the soft-deleted record
-        const { error: restoreError } = await withCatch(async () => {
-          return await ctx.db.groupMember.update({
-            where: { id: deletedInvite.id },
-            data: {
-              deletedAt: null,
-              status: "INVITED",
-              invitedById: ctx.userId,
-              isAdmin: input.role === "admin",
-            },
-          });
-        });
-
-        if (restoreError !== null) {
-          console.error("Error restoring invite:", restoreError);
-          return {
-            data: null,
-            error: {
-              message: "An error occurred while inviting the user.",
-              code: "INTERNAL_SERVER_ERROR",
-            },
-          };
-        }
-
-        console.log("Restored previously deleted invite for user:", input.inviteeUserId);
-        return { data: "User invited successfully", error: null };
-      }
-
       const { error: inviteUserError } = await withCatch(async () => {
         return await ctx.db.groupMember.create({
           data: {
@@ -903,11 +852,10 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      // Soft delete the invite
+      // Hard delete the invite
       const { error: deleteError } = await withCatch(async () => {
-        return await ctx.db.groupMember.update({
+        return await ctx.db.groupMember.delete({
           where: { id: invitedMember.id },
-          data: { deletedAt: new Date() },
         });
       });
 
@@ -930,16 +878,10 @@ export const groupRouter = createTRPCRouter({
       const groupId = input.groupId;
       const targetUserId = input.userId;
 
-      // Find the soft-deleted invite
-      const { data: deletedInvite, error: findError } = await withCatch(async () => {
+      // Check if already a member or has a pending invite
+      const { data: existingMember, error: findError } = await withCatch(async () => {
         return await ctx.db.groupMember.findFirst({
-          where: {
-            groupId: groupId,
-            memberId: targetUserId,
-            status: "INVITED",
-            deletedAt: { not: null },
-          },
-          orderBy: { deletedAt: "desc" },
+          where: { groupId, memberId: targetUserId },
         });
       });
 
@@ -950,21 +892,27 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      if (!deletedInvite) {
+      if (existingMember) {
         return {
           data: null,
-          error: { message: "No revoked invite found to restore.", code: "NOT_FOUND" },
+          error: { message: "User already has an active membership or invite.", code: "BAD_REQUEST" },
         };
       }
 
-      const { error: restoreError } = await withCatch(async () => {
-        return await ctx.db.groupMember.update({
-          where: { id: deletedInvite.id },
-          data: { deletedAt: null },
+      // Re-create the invite
+      const { error: createError } = await withCatch(async () => {
+        return await ctx.db.groupMember.create({
+          data: {
+            groupId,
+            memberId: targetUserId,
+            invitedById: ctx.userId,
+            isAdmin: false,
+            status: "INVITED",
+          },
         });
       });
 
-      if (restoreError !== null) {
+      if (createError !== null) {
         return {
           data: null,
           error: {
@@ -1009,21 +957,24 @@ export const groupRouter = createTRPCRouter({
       }
 
       if (existingInvite.memberId !== ctx.userId) {
-        console.warn("user can not accept invite on behalf of someone else", ctx.userId);
         return {
           data: null,
           error: {
-            message: "user can not accept invite on behalf of someone else",
+            message: "You can only accept your own invitations.",
             code: "FORBIDDEN",
           },
         };
       }
-      console.log(
-        "accepting invite for group member:",
-        existingInvite.id,
-        "for group:",
-        existingInvite.groupId,
-      );
+
+      if (existingInvite.status !== "INVITED") {
+        return {
+          data: null,
+          error: {
+            message: "This invitation has already been responded to.",
+            code: "BAD_REQUEST",
+          },
+        };
+      }
 
       const { error } = await withCatch(async () => {
         return await ctx.db.groupMember.update({
@@ -1045,14 +996,74 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      console.log(
-        "Group invite accepted successfully:",
-        existingInvite.groupId,
-        "by user:",
-        ctx.userId,
-      );
-
       return { data: "Invite accepted successfully", error: null };
+    }),
+
+  declineInvite: protectedProcedure
+    .input(z.object({ groupMemberId: z.number() }))
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<string>> => {
+      const { data: existingInvite, error: fetchError } = await withCatch(async () => {
+        return await ctx.db.groupMember.findUnique({
+          where: { id: input.groupMemberId, deletedAt: null },
+        });
+      });
+
+      if (fetchError !== null) {
+        console.error("Error fetching invite:", fetchError);
+        return {
+          data: null,
+          error: {
+            message: "An error occurred while fetching the invite.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      if (!existingInvite) {
+        return {
+          data: null,
+          error: { message: "Invite not found", code: "NOT_FOUND" },
+        };
+      }
+
+      if (existingInvite.memberId !== ctx.userId) {
+        return {
+          data: null,
+          error: {
+            message: "You can only decline your own invitations.",
+            code: "FORBIDDEN",
+          },
+        };
+      }
+
+      if (existingInvite.status !== "INVITED") {
+        return {
+          data: null,
+          error: {
+            message: "This invitation has already been responded to.",
+            code: "BAD_REQUEST",
+          },
+        };
+      }
+
+      const { error } = await withCatch(async () => {
+        return await ctx.db.groupMember.delete({
+          where: { id: input.groupMemberId },
+        });
+      });
+
+      if (error !== null) {
+        console.error("Error declining invite:", error);
+        return {
+          data: null,
+          error: {
+            message: "An error occurred while declining the invite.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      return { data: "Invite declined successfully", error: null };
     }),
 
   createTransaction: groupMemberProcedure

@@ -4,6 +4,7 @@ import { api, HydrateClient } from "~/trpc/server";
 
 export default async function GroupsPage() {
   await api.user.getGroups.prefetch();
+  await api.user.getPendingInvites.prefetch();
 
   return (
     <HydrateClient>

@@ -3,7 +3,7 @@ import { withCatch } from "~/lib/utils";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import type { ApiResponse } from "~/server/contracts/apiResponse";
-import type { GetUserGroupsResponse, SafeUser } from "~/server/contracts/users";
+import type { GetUserGroupsResponse, PendingInvite, SafeUser } from "~/server/contracts/users";
 import { calculateGroupBalances } from "~/server/helpers/balanceCalculation";
 
 export const userRouter = createTRPCRouter({
@@ -154,6 +154,69 @@ export const userRouter = createTRPCRouter({
       });
 
       return { data: userGroups, error: null };
+    },
+  ),
+
+  getPendingInvites: protectedProcedure.query(
+    async ({ ctx }): Promise<ApiResponse<PendingInvite[]>> => {
+      const { data: invites, error } = await withCatch(
+        async () =>
+          await ctx.db.groupMember.findMany({
+            where: {
+              memberId: ctx.userId,
+              status: "INVITED",
+              deletedAt: null,
+              group: { deletedAt: null },
+            },
+            select: {
+              id: true,
+              groupId: true,
+              createdAt: true,
+              group: {
+                select: {
+                  name: true,
+                  slug: true,
+                  members: {
+                    where: { status: "JOINED", deletedAt: null },
+                    select: { id: true },
+                  },
+                },
+              },
+              invitedBy: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  createdAt: true,
+                },
+              },
+            },
+            orderBy: { createdAt: "desc" },
+          }),
+      );
+
+      if (error !== null) {
+        console.error("Error fetching pending invites:", error);
+        return {
+          data: null,
+          error: {
+            message: "An error occurred while fetching invitations.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      const pendingInvites: PendingInvite[] = invites.map((invite) => ({
+        id: invite.id,
+        groupId: invite.groupId,
+        groupName: invite.group.name,
+        groupSlug: invite.group.slug,
+        invitedBy: invite.invitedBy,
+        memberCount: invite.group.members.length,
+        createdAt: invite.createdAt,
+      }));
+
+      return { data: pendingInvites, error: null };
     },
   ),
 

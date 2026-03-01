@@ -16,6 +16,16 @@ export type GetUserGroupsResponse = {
   };
 };
 
+export type PendingInvite = {
+  id: number;
+  groupId: number;
+  groupName: string;
+  groupSlug: string;
+  invitedBy: SafeUser;
+  memberCount: number;
+  createdAt: Date;
+};
+
 const firstName = z.string().min(1).max(50);
 const lastName = z.string().min(1).max(50);
 const email = z.string().email().max(100);

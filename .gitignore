@@ -48,3 +48,4 @@ yarn-error.log*
 # my ignored files
 seed.*
 agents.md
+.planned-features/
