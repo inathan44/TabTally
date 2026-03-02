@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Loader2, X } from "lucide-react";
@@ -23,6 +23,8 @@ import type { SetupProfileInput } from "~/server/contracts/users";
 
 export default function UsernameSetupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") ?? "/groups";
   const { data: profileResult } = api.user.getProfile.useQuery();
   const profile = profileResult?.data;
 
@@ -71,7 +73,7 @@ export default function UsernameSetupForm() {
         form.setError("username", { message: result.error.message });
         return;
       }
-      router.push("/groups");
+      router.push(redirectTo);
       router.refresh();
     },
   });
