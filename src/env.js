@@ -9,9 +9,8 @@ export const env = createEnv({
   server: {
     DATABASE_URL: z.string().url(),
     TEST_DATABASE_URL: z.string().url().optional(),
-    NODE_ENV: z
-      .enum(["development", "test", "production"])
-      .default("development"),
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
   },
 
   /**
@@ -31,6 +30,7 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     TEST_DATABASE_URL: process.env.TEST_DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
+    GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
   /**

@@ -12,6 +12,7 @@ import { cn } from "~/lib/utils";
 
 interface BalancesTabProps {
   group: GetGroupResponse;
+  isFetching: boolean;
 }
 
 interface SettleUpTarget {
@@ -25,7 +26,7 @@ interface SettleUpTarget {
   toZelleUsername: string | null;
 }
 
-export default function BalancesTab({ group }: BalancesTabProps) {
+export default function BalancesTab({ group, isFetching }: BalancesTabProps) {
   const { userId } = useAuth();
   const [settleTarget, setSettleTarget] = useState<SettleUpTarget | null>(null);
   const memberMap = new Map(group.members.map((m) => [m.id, m]));
@@ -73,7 +74,11 @@ export default function BalancesTab({ group }: BalancesTabProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className={cn("space-y-6 transition-opacity", {
+        "pointer-events-none opacity-50": isFetching,
+      })}
+    >
       {/* Settlement cards */}
       <div className="space-y-2">
         {group.settlements.map((settlement, index) => {

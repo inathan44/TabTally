@@ -26,8 +26,21 @@ model User {
   createdTransactions        Transaction[]       @relation("TransactionCreator")
   paidTransactions           Transaction[]       @relation("TransactionPayer")
   receivedTransactionDetails TransactionDetail[] @relation("TransactionRecipients")
+  plan                       UserPlan?
 
   @@index([email])
+}
+
+// Admin-only table — no user-facing mutations touch this.
+// Modify directly in DB or via admin tooling.
+model UserPlan {
+  id                Int      @id @default(autoincrement())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  tier              UserTier @default(FREE)
+  rateLimitOverride Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Group {
@@ -47,6 +60,12 @@ model Group {
 
   @@index([name])
   @@index([slug])
+}
+
+enum UserTier {
+  FREE
+  PAID
+  DEV
 }
 
 enum GroupMemberStatus {

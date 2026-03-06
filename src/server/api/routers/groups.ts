@@ -3,6 +3,13 @@ import { z } from "zod";
 import { withCatch } from "~/lib/utils";
 import { createGroupSlug } from "~/lib/slugify";
 import { storageService, type UploadResult } from "~/server/services/storage";
+import { receiptParserService } from "~/server/services/receipt-parser";
+import { checkRateLimit, getRateLimitConfig } from "~/server/middleware/rate-limit";
+import {
+  parseReceiptInputSchema,
+  receiptUploadMimeTypes,
+  type ReceiptData,
+} from "~/server/contracts/receipt";
 
 import {
   createTRPCRouter,
@@ -392,7 +399,7 @@ export const groupRouter = createTRPCRouter({
       const { data: transactions, error: fetchError } = await withCatch(async () => {
         return await ctx.db.transaction.findMany({
           where,
-          orderBy: { transactionDate: "desc" },
+          orderBy: { createdAt: "desc" },
           include: {
             transactionDetails: {
               include: {
@@ -1669,7 +1676,7 @@ export const groupRouter = createTRPCRouter({
       z.object({
         groupId: z.number().int().positive(),
         fileName: z.string().min(1).max(255),
-        mimeType: z.enum(["image/jpeg", "image/png", "image/heic", "application/pdf"]),
+        mimeType: z.enum(receiptUploadMimeTypes),
       }),
     )
     .mutation(async ({ ctx, input }): Promise<ApiResponse<UploadResult>> => {
@@ -1793,6 +1800,78 @@ export const groupRouter = createTRPCRouter({
         data: balanceData.userBalances,
         error: null,
       };
+    }),
+
+  parseReceipt: groupMemberProcedure
+    .input(parseReceiptInputSchema)
+    .mutation(async ({ ctx, input }): Promise<ApiResponse<ReceiptData>> => {
+      console.log(
+        `[parseReceipt] Starting for user ${ctx.userId}, group ${input.groupId}, mimeType=${input.mimeType}, imageSize=${Math.round(input.imageBase64.length / 1024)}KB`,
+      );
+
+      const { data: userPlan, error: planError } = await withCatch(async () => {
+        return await ctx.db.userPlan.findUnique({
+          where: { userId: ctx.userId },
+          select: { tier: true, rateLimitOverride: true },
+        });
+      });
+
+      if (planError !== null) {
+        console.error(`[parseReceipt] Failed to load user plan for ${ctx.userId}:`, planError);
+        return {
+          data: null,
+          error: { message: "Failed to verify user plan.", code: "INTERNAL_SERVER_ERROR" },
+        };
+      }
+
+      // No plan row = FREE tier (default)
+      const tier = userPlan?.tier ?? "FREE";
+      const config = getRateLimitConfig(tier, userPlan?.rateLimitOverride);
+      const { allowed, remaining, resetInMs } = checkRateLimit(ctx.userId, config);
+
+      if (!allowed) {
+        const resetSeconds = Math.ceil(resetInMs / 1000);
+        console.warn(
+          `[parseReceipt] Rate limited user ${ctx.userId} (${tier}), resets in ${resetSeconds}s`,
+        );
+        return {
+          data: null,
+          error: {
+            message: `Rate limit exceeded. Try again in ${resetSeconds} second${resetSeconds === 1 ? "" : "s"}.`,
+            code: "TOO_MANY_REQUESTS",
+          },
+        };
+      }
+
+      console.log(
+        `[parseReceipt] User ${ctx.userId} (${tier}) — calling AI model (${remaining} requests remaining)`,
+      );
+
+      const startTime = Date.now();
+      const { data, error } = await withCatch(async () => {
+        return await receiptParserService.parseReceipt(input.imageBase64, input.mimeType);
+      });
+      const durationMs = Date.now() - startTime;
+
+      if (error !== null) {
+        console.error(
+          `[parseReceipt] AI parse failed after ${durationMs}ms for user ${ctx.userId}:`,
+          error,
+        );
+        return {
+          data: null,
+          error: {
+            message: "Failed to parse receipt. Please try again or enter details manually.",
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        };
+      }
+
+      console.log(
+        `[parseReceipt] Success in ${durationMs}ms — ${data.items.length} items, total=$${data.total}, merchant=${data.merchantName ?? "unknown"}`,
+      );
+
+      return { data, error: null };
     }),
 });
 

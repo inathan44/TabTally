@@ -12,6 +12,7 @@ import BalancesTab from "~/components/group-balances-tab";
 import { GroupBadge } from "~/components/group-badges";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
+import { Skeleton } from "~/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Separator } from "~/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -59,6 +60,7 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
     data: groupResponse,
     error: apiError,
     isPending,
+    isFetching,
   } = api.group.getGroupBySlug.useQuery({ slug: groupSlug });
 
   const group = groupResponse?.data;
@@ -66,18 +68,20 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
 
   if (isPending) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-        <div className="animate-pulse space-y-6">
-          <div className="bg-muted h-5 w-32 rounded" />
-          <div className="space-y-2">
-            <div className="bg-muted h-6 w-48 rounded" />
-            <div className="bg-muted h-4 w-72 rounded" />
-          </div>
-          <div className="bg-muted h-10 w-full rounded" />
-          <div className="grid gap-3 sm:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-muted h-16 rounded-lg" />
-            ))}
+      <div className="overflow-x-hidden">
+        <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+          <div className="space-y-6">
+            <Skeleton className="h-5 w-32" />
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+            <Skeleton className="h-10 w-full" />
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-16 rounded-lg" />
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -107,9 +111,10 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
     );
   }
 
-  const totalSpending = group.transactions
-    ?.filter((t) => !t.isSettlement)
-    .reduce((sum, t) => sum + Number(t.amount), 0) ?? 0;
+  const totalSpending =
+    group.transactions
+      ?.filter((t) => !t.isSettlement)
+      .reduce((sum, t) => sum + Number(t.amount), 0) ?? 0;
   const joinedCount = group.members.filter((m) => m.status === "JOINED").length;
   const invitedCount = group.members.filter((m) => m.status === "INVITED").length;
   const transactionCount = group.transactions?.length ?? 0;
@@ -167,7 +172,7 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
             </div>
           </div>
           {isGroupAdmin && (
-            <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+            <Button asChild variant="ghost" size="icon" className="text-muted-foreground h-8 w-8">
               <Link href={`/groups/${groupSlug}/settings`}>
                 <Settings className="h-4 w-4" />
               </Link>
@@ -201,11 +206,16 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
           </TabsList>
 
           <TabsContent value="transactions" className="mt-6">
-            <TransactionsTab group={group} totalSpending={totalSpending} isGroupAdmin={isGroupAdmin} userId={currentMember?.id} />
+            <TransactionsTab
+              group={group}
+              totalSpending={totalSpending}
+              isGroupAdmin={isGroupAdmin}
+              userId={currentMember?.id}
+            />
           </TabsContent>
 
           <TabsContent value="balances" className="mt-6">
-            <BalancesTab group={group} />
+            <BalancesTab group={group} isFetching={isFetching} />
           </TabsContent>
 
           <TabsContent value="members" className="mt-6">

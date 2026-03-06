@@ -3,9 +3,10 @@
 import { useRef, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "~/trpc/react";
+import { receiptUploadMimeTypes, type ReceiptUploadMimeType } from "~/server/contracts/receipt";
 
-const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/png", "image/heic", "application/pdf"];
-type AcceptedMimeType = "image/jpeg" | "image/png" | "image/heic" | "application/pdf";
+const ACCEPTED_FILE_TYPES: readonly string[] = receiptUploadMimeTypes;
+type AcceptedMimeType = ReceiptUploadMimeType;
 
 interface UseReceiptUploadOptions {
   groupId: number;
@@ -62,7 +63,7 @@ export function useReceiptUpload({ groupId, initialUrl = null }: UseReceiptUploa
       if (!file) return;
 
       if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
-        throw new Error("Invalid file type. Accepted: JPG, PNG, HEIC, PDF.");
+        throw new Error("Invalid file type. Accepted: JPG, PNG, WebP, HEIC, PDF.");
       }
 
       await uploadMutation.mutateAsync(file);
@@ -75,10 +76,17 @@ export function useReceiptUpload({ groupId, initialUrl = null }: UseReceiptUploa
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [uploadMutation]);
 
-  const reset = useCallback(
-    () => {
-      uploadMutation.reset();
-      if (fileInputRef.current) fileInputRef.current.value = "";
+  const reset = useCallback(() => {
+    uploadMutation.reset();
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [uploadMutation]);
+
+  const uploadFile = useCallback(
+    async (file: File) => {
+      if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
+        throw new Error("Invalid file type. Accepted: JPG, PNG, WebP, HEIC, PDF.");
+      }
+      await uploadMutation.mutateAsync(file);
     },
     [uploadMutation],
   );
@@ -90,6 +98,7 @@ export function useReceiptUpload({ groupId, initialUrl = null }: UseReceiptUploa
     isPending: uploadMutation.isPending,
     error: uploadMutation.error?.message ?? null,
     handleFileChange,
+    uploadFile,
     removeReceipt,
     reset,
   };

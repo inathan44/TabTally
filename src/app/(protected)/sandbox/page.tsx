@@ -3,6 +3,7 @@ import { api } from "~/trpc/server";
 import { TestGroupCreation } from "./TestGroupCreation";
 import { TestTransactionCreation } from "./TestTransactionCreation";
 import AnimatedButtonExample from "~/components/AnimatedButtonExample";
+import ReceiptParserPlayground from "./ReceiptParserPlayground";
 
 export default async function Sandbox() {
   const { userId } = await auth();
@@ -27,6 +28,10 @@ export default async function Sandbox() {
       <TestGroupCreation />
 
       <TestTransactionCreation />
+
+      <div className="border-t pt-8">
+        <ReceiptParserPlayground />
+      </div>
 
       <div className="border-t pt-8">
         <AnimatedButtonExample />

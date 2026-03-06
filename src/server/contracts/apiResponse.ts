@@ -4,7 +4,8 @@ type ErrorCodes =
   | "FORBIDDEN"
   | "INTERNAL_SERVER_ERROR"
   | "BAD_REQUEST"
-  | "CONFLICT";
+  | "CONFLICT"
+  | "TOO_MANY_REQUESTS";
 
 type SuccessResponse<T> = {
   data: T;

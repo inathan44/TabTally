@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { api, HydrateClient } from "~/trpc/server";
 import GroupInfo from "./GroupInfo";
 
@@ -17,7 +18,9 @@ export default async function page({ params }: GroupPageProps) {
   return (
     <HydrateClient>
       <div>
-        <GroupInfo groupSlug={groupSlug} />
+        <Suspense>
+          <GroupInfo groupSlug={groupSlug} />
+        </Suspense>
       </div>
     </HydrateClient>
   );
