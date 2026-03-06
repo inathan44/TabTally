@@ -75,9 +75,12 @@ export default function CreateTransactionModal({
     initialUrl: isEditMode ? (editTransaction.receiptUrl ?? null) : null,
   });
 
+  // Fallback for uncontrolled mode — no-op is intentional when onOpenChange isn't provided
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const noop = () => {};
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
-  const setOpen = isControlled ? (controlledOnOpenChange ?? (() => {})) : setInternalOpen;
+  const setOpen = isControlled ? (controlledOnOpenChange ?? noop) : setInternalOpen;
 
   const defaultValues = isEditMode
     ? {
@@ -121,15 +124,16 @@ export default function CreateTransactionModal({
 
   const selectedMemberIds = new Set(fields.map((f) => f.recipientId));
 
-  // Auto-select payer in splits when payer changes
+  // Auto-select payer in splits when payer changes (create mode only)
   useEffect(() => {
+    if (isEditMode) return;
     if (!watchedPayerId) return;
     const currentSplits = form.getValues("splits");
     const alreadyIncluded = currentSplits.some((s) => s.recipientId === watchedPayerId);
     if (!alreadyIncluded) {
       append({ recipientId: watchedPayerId, amount: "" });
     }
-  }, [watchedPayerId, form]);
+  }, [watchedPayerId, form, append, isEditMode]);
 
   const toggleMember = (memberId: string) => {
     const currentSplits = form.getValues("splits");
@@ -568,6 +572,7 @@ export default function CreateTransactionModal({
                                   />
                                 </div>
                               </FormControl>
+                              <FormMessage />
                             </FormItem>
                           )}
                         />

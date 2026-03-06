@@ -11,7 +11,7 @@ export type SafeTransactionDetail = Omit<
 };
 
 export const createTransactionDetailSchema = z.object({
-  amount: z.number().min(0, "Amount must be a positive number"),
+  amount: z.number().nonnegative("Amount must not be negative"),
   recipientId: z.string(),
 });
 

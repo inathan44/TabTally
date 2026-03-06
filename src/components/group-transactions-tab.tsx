@@ -67,8 +67,14 @@ export default function TransactionsTab({
       };
 
       setOrDelete("search", newFilters.search || undefined);
-      setOrDelete("categories", newFilters.categories.length > 0 ? newFilters.categories.join(",") : undefined);
-      setOrDelete("payers", newFilters.payerIds.length > 0 ? newFilters.payerIds.join(",") : undefined);
+      setOrDelete(
+        "categories",
+        newFilters.categories.length > 0 ? newFilters.categories.join(",") : undefined,
+      );
+      setOrDelete(
+        "payers",
+        newFilters.payerIds.length > 0 ? newFilters.payerIds.join(",") : undefined,
+      );
       setOrDelete("from", newFilters.dateFrom?.toISOString().split("T")[0]);
       setOrDelete("to", newFilters.dateTo?.toISOString().split("T")[0]);
 
@@ -80,8 +86,8 @@ export default function TransactionsTab({
 
   // Build query input from URL filters
   const validCategories = filters.categories.filter((c) =>
-    transactionCategories.includes(c as typeof transactionCategories[number]),
-  ) as (typeof transactionCategories[number])[];
+    transactionCategories.includes(c as (typeof transactionCategories)[number]),
+  ) as (typeof transactionCategories)[number][];
 
   const queryInput = {
     groupId: group.id,
@@ -92,10 +98,8 @@ export default function TransactionsTab({
     ...(filters.dateTo && { dateTo: filters.dateTo }),
   };
 
-  const {
-    data: txResponse,
-    isFetching: txFetching,
-  } = api.group.getGroupTransactions.useQuery(queryInput);
+  const { data: txResponse, isFetching: txFetching } =
+    api.group.getGroupTransactions.useQuery(queryInput);
 
   const transactions = txResponse?.data ?? [];
   const totalCount = group.transactions?.length ?? 0;
@@ -103,19 +107,22 @@ export default function TransactionsTab({
   const canEdit = (transaction: SafeTransaction) =>
     isGroupAdmin || transaction.createdById === userId;
 
-  const getUserShare = (transaction: SafeTransaction): { label: string; className: string } | null => {
+  const getUserShare = (
+    transaction: SafeTransaction,
+  ): { label: string; className: string } | null => {
     if (!userId || transaction.isSettlement) return null;
 
-    const userSplit = transaction.transactionDetails.find((d) => d.recipientId === userId);
-    const isPayer = transaction.payerId === userId;
+    const amountPaid = transaction.payerId === userId ? Number(transaction.amount) : 0;
+    const amountOwed = Number(
+      transaction.transactionDetails.find((d) => d.recipientId === userId)?.amount ?? 0,
+    );
+    const net = amountPaid - amountOwed;
 
-    if (isPayer && userSplit) {
-      const owedBack = Math.abs(Number(transaction.amount)) - Number(userSplit.amount);
-      if (owedBack > 0) {
-        return { label: `You are owed $${owedBack.toFixed(2)}`, className: "text-green-600" };
-      }
-    } else if (userSplit) {
-      return { label: `You owe $${Number(userSplit.amount).toFixed(2)}`, className: "text-orange-600" };
+    if (net > 0) {
+      return { label: `You are owed $${net.toFixed(2)}`, className: "text-green-600" };
+    }
+    if (net < 0) {
+      return { label: `You owe $${Math.abs(net).toFixed(2)}`, className: "text-orange-600" };
     }
 
     return null;
@@ -126,21 +133,16 @@ export default function TransactionsTab({
       <div className="mb-5 flex items-center justify-between">
         {totalSpending > 0 && (
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/8">
-              <DollarSign className="h-4 w-4 text-success" />
+            <div className="bg-success/8 flex h-8 w-8 items-center justify-center rounded-lg">
+              <DollarSign className="text-success h-4 w-4" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Total spent</p>
-              <p className="text-sm font-semibold text-foreground">
-                ${totalSpending.toFixed(2)}
-              </p>
+              <p className="text-muted-foreground text-xs">Total spent</p>
+              <p className="text-foreground text-sm font-semibold">${totalSpending.toFixed(2)}</p>
             </div>
           </div>
         )}
-        <CreateTransactionModal
-          groupId={group.id}
-          groupMembers={group.members}
-        />
+        <CreateTransactionModal groupId={group.id} groupMembers={group.members} />
       </div>
 
       {totalCount > 0 && (
@@ -153,7 +155,7 @@ export default function TransactionsTab({
             onToggleExpanded={() => setFiltersExpanded((prev) => !prev)}
           />
           {filtersActive && !txFetching && (
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-2 text-xs">
               Showing {transactions.length} of {totalCount} transactions
             </p>
           )}
@@ -163,7 +165,7 @@ export default function TransactionsTab({
       {txFetching ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
+            <div key={i} className="bg-muted h-16 animate-pulse rounded-lg" />
           ))}
         </div>
       ) : transactions.length > 0 ? (
@@ -174,29 +176,31 @@ export default function TransactionsTab({
             return (
               <Card
                 key={transaction.id}
-                className="cursor-pointer gap-0 py-0 transition-colors hover:bg-muted/50"
+                className="hover:bg-muted/50 cursor-pointer gap-0 py-0 transition-colors"
                 onClick={() => setSelectedTransaction(transaction)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-medium text-foreground">
+                        <p className="text-foreground truncate text-sm font-medium">
                           {transaction.isSettlement
                             ? `${transaction.payer.firstName} → ${transaction.transactionDetails?.[0]?.recipient.firstName ?? "?"}`
                             : (transaction.description ?? "Untitled expense")}
                         </p>
                         {transaction.category && (
-                          <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                          <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
                             {transactionCategoryLabels[transaction.category as TransactionCategory]}
                           </Badge>
                         )}
                         {transaction.receiptUrl && (
-                          <Receipt className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          <Receipt className="text-muted-foreground h-3 w-3 shrink-0" />
                         )}
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {transaction.isSettlement ? "Settlement" : `${transaction.payer.firstName} paid`}
+                      <p className="text-muted-foreground mt-0.5 text-xs">
+                        {transaction.isSettlement
+                          ? "Settlement"
+                          : `${transaction.payer.firstName} paid`}
                         {" · "}
                         {new Date(transaction.transactionDate).toLocaleDateString("en-US", {
                           month: "short",
@@ -205,15 +209,15 @@ export default function TransactionsTab({
                       </p>
                     </div>
                     <div className="ml-4 text-right">
-                      <p className={cn("text-sm font-semibold", {
-                        "text-green-600": transaction.isSettlement,
-                        "text-foreground": !transaction.isSettlement,
-                      })}>
+                      <p
+                        className={cn("text-sm font-semibold", {
+                          "text-green-600": transaction.isSettlement,
+                          "text-foreground": !transaction.isSettlement,
+                        })}
+                      >
                         ${Math.abs(Number(transaction.amount)).toFixed(2)}
                       </p>
-                      {share && (
-                        <p className={cn("text-xs", share.className)}>{share.label}</p>
-                      )}
+                      {share && <p className={cn("text-xs", share.className)}>{share.label}</p>}
                     </div>
                   </div>
                 </CardContent>
@@ -222,22 +226,16 @@ export default function TransactionsTab({
           })}
         </div>
       ) : filtersActive ? (
-        <div className="rounded-xl border-2 border-dashed border-border px-6 py-12 text-center">
-          <Search className="mx-auto h-8 w-8 text-muted-foreground/40" />
-          <p className="mt-3 text-sm font-medium text-foreground">
-            No matching transactions
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Try adjusting your filters.
-          </p>
+        <div className="border-border rounded-xl border-2 border-dashed px-6 py-12 text-center">
+          <Search className="text-muted-foreground/40 mx-auto h-8 w-8" />
+          <p className="text-foreground mt-3 text-sm font-medium">No matching transactions</p>
+          <p className="text-muted-foreground mt-1 text-xs">Try adjusting your filters.</p>
         </div>
       ) : (
-        <div className="rounded-xl border-2 border-dashed border-border px-6 py-12 text-center">
-          <Receipt className="mx-auto h-8 w-8 text-muted-foreground/40" />
-          <p className="mt-3 text-sm font-medium text-foreground">
-            No transactions yet
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+        <div className="border-border rounded-xl border-2 border-dashed px-6 py-12 text-center">
+          <Receipt className="text-muted-foreground/40 mx-auto h-8 w-8" />
+          <p className="text-foreground mt-3 text-sm font-medium">No transactions yet</p>
+          <p className="text-muted-foreground mt-1 text-xs">
             Add your first expense to get started.
           </p>
         </div>
@@ -246,7 +244,9 @@ export default function TransactionsTab({
       <TransactionDetailSheet
         transaction={selectedTransaction}
         open={!!selectedTransaction}
-        onOpenChange={(open) => { if (!open) setSelectedTransaction(null); }}
+        onOpenChange={(open) => {
+          if (!open) setSelectedTransaction(null);
+        }}
         groupId={group.id}
         userId={userId}
         canEdit={selectedTransaction ? canEdit(selectedTransaction) : false}
@@ -264,7 +264,9 @@ export default function TransactionsTab({
           groupMembers={group.members}
           editTransaction={editingTransaction}
           open={!!editingTransaction}
-          onOpenChange={(open) => { if (!open) setEditingTransaction(null); }}
+          onOpenChange={(open) => {
+            if (!open) setEditingTransaction(null);
+          }}
         />
       )}
     </div>

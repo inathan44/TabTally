@@ -1226,9 +1226,12 @@ export const groupRouter = createTRPCRouter({
       console.log(
         `[createTransaction] User ${ctx.userId} creating transaction in group ${input.groupId}, amount=${input.amount}`,
       );
-      if (!verifyTransactionDetails(input.amount, input.transactionDetails, input.payerId)) {
+
+      const nonZeroDetails = input.transactionDetails.filter((d) => d.amount > 0);
+
+      if (!verifyTransactionDetails(input.amount, nonZeroDetails, input.payerId)) {
         console.warn(
-          `[createTransaction] Invalid details for group ${input.groupId}: amount=${input.amount}, splits=${input.transactionDetails.length}, payerId=${input.payerId}`,
+          `[createTransaction] Invalid details for group ${input.groupId}: amount=${input.amount}, splits=${nonZeroDetails.length}, payerId=${input.payerId}`,
         );
         return {
           data: null,
@@ -1241,7 +1244,7 @@ export const groupRouter = createTRPCRouter({
       }
 
       // Verify that payer and all recipients are members of the group
-      const allRecipientIds = input.transactionDetails.map((detail) => detail.recipientId);
+      const allRecipientIds = nonZeroDetails.map((detail) => detail.recipientId);
       const allUserIds = [input.payerId, ...allRecipientIds];
 
       const { error: membershipError } = await verifyUsersAreGroupMembers(
@@ -1269,7 +1272,7 @@ export const groupRouter = createTRPCRouter({
           });
 
           await Promise.all(
-            input.transactionDetails.map(async (detail) => {
+            nonZeroDetails.map(async (detail) => {
               return await tx.transactionDetail.create({
                 data: {
                   transactionId: newTransaction.id,
@@ -1436,9 +1439,11 @@ export const groupRouter = createTRPCRouter({
         return { data: null, error: permError };
       }
 
-      if (!verifyTransactionDetails(input.amount, input.transactionDetails, input.payerId)) {
+      const nonZeroDetails = input.transactionDetails.filter((d) => d.amount > 0);
+
+      if (!verifyTransactionDetails(input.amount, nonZeroDetails, input.payerId)) {
         console.warn(
-          `[updateTransaction] Invalid details for transaction ${input.transactionId}: amount=${input.amount}, splits=${input.transactionDetails.length}, payerId=${input.payerId}`,
+          `[updateTransaction] Invalid details for transaction ${input.transactionId}: amount=${input.amount}, splits=${nonZeroDetails.length}, payerId=${input.payerId}`,
         );
         return {
           data: null,
@@ -1451,7 +1456,7 @@ export const groupRouter = createTRPCRouter({
       }
 
       // Verify all users are group members
-      const allRecipientIds = input.transactionDetails.map((detail) => detail.recipientId);
+      const allRecipientIds = nonZeroDetails.map((detail) => detail.recipientId);
       const allUserIds = [input.payerId, ...allRecipientIds];
       const { error: membershipError } = await verifyUsersAreGroupMembers(
         ctx,
@@ -1481,7 +1486,7 @@ export const groupRouter = createTRPCRouter({
           });
 
           await Promise.all(
-            input.transactionDetails.map(async (detail) => {
+            nonZeroDetails.map(async (detail) => {
               return await tx.transactionDetail.create({
                 data: {
                   transactionId: input.transactionId,
