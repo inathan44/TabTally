@@ -186,7 +186,7 @@ export default function TransactionsTab({
                         <p className="text-foreground truncate text-sm font-medium">
                           {transaction.isSettlement
                             ? `${transaction.payer.firstName} → ${transaction.transactionDetails?.[0]?.recipient.firstName ?? "?"}`
-                            : (transaction.description ?? "Untitled expense")}
+                            : transaction.title}
                         </p>
                         {transaction.category && (
                           <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">

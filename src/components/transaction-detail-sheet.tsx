@@ -40,9 +40,7 @@ export default function TransactionDetailSheet({
   if (!transaction) return null;
 
   const amount = Math.abs(Number(transaction.amount));
-  const userSplit = transaction.transactionDetails.find(
-    (d) => d.recipientId === userId,
-  );
+  const userSplit = transaction.transactionDetails.find((d) => d.recipientId === userId);
   const userOwes = userSplit && transaction.payerId !== userId;
   const userPaid = transaction.payerId === userId;
 
@@ -53,7 +51,7 @@ export default function TransactionDetailSheet({
           <SheetTitle>
             {transaction.isSettlement
               ? `${transaction.payer.firstName} settled up`
-              : (transaction.description ?? "Untitled expense")}
+              : transaction.title}
           </SheetTitle>
           <SheetDescription>
             {new Date(transaction.transactionDate).toLocaleDateString("en-US", {
@@ -68,10 +66,12 @@ export default function TransactionDetailSheet({
         <div className="space-y-6 px-4 pb-4">
           {/* Amount */}
           <div className="text-center">
-            <p className={cn("text-3xl font-bold", {
-              "text-green-600": transaction.isSettlement,
-              "text-foreground": !transaction.isSettlement,
-            })}>
+            <p
+              className={cn("text-3xl font-bold", {
+                "text-green-600": transaction.isSettlement,
+                "text-foreground": !transaction.isSettlement,
+              })}
+            >
               ${amount.toFixed(2)}
             </p>
             {transaction.category && (
@@ -95,7 +95,7 @@ export default function TransactionDetailSheet({
               <p className="text-sm font-medium">
                 {transaction.payer.firstName} {transaction.payer.lastName}
               </p>
-              <p className="text-xs text-muted-foreground">Paid the full amount</p>
+              <p className="text-muted-foreground text-xs">Paid the full amount</p>
             </div>
           </div>
 
@@ -109,15 +109,17 @@ export default function TransactionDetailSheet({
                   <div key={detail.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-[9px] font-medium bg-muted">
+                        <AvatarFallback className="bg-muted text-[9px] font-medium">
                           {detail.recipient.firstName.charAt(0)}
                           {detail.recipient.lastName.charAt(0)}
                         </AvatarFallback>
                       </Avatar>
-                      <span className={cn("text-sm", {
-                        "font-medium": detail.recipientId === userId,
-                        "text-muted-foreground": detail.recipientId !== userId,
-                      })}>
+                      <span
+                        className={cn("text-sm", {
+                          "font-medium": detail.recipientId === userId,
+                          "text-muted-foreground": detail.recipientId !== userId,
+                        })}
+                      >
                         {detail.recipientId === userId
                           ? "You"
                           : `${detail.recipient.firstName} ${detail.recipient.lastName}`}
@@ -136,7 +138,7 @@ export default function TransactionDetailSheet({
               <Separator />
               <div className="flex items-center gap-3">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-green-500/8 text-green-600 text-[11px] font-medium">
+                  <AvatarFallback className="bg-green-500/8 text-[11px] font-medium text-green-600">
                     {transaction.transactionDetails[0].recipient.firstName.charAt(0)}
                     {transaction.transactionDetails[0].recipient.lastName.charAt(0)}
                   </AvatarFallback>
@@ -146,7 +148,7 @@ export default function TransactionDetailSheet({
                     {transaction.transactionDetails[0].recipient.firstName}{" "}
                     {transaction.transactionDetails[0].recipient.lastName}
                   </p>
-                  <p className="text-xs text-muted-foreground">Received payment</p>
+                  <p className="text-muted-foreground text-xs">Received payment</p>
                 </div>
               </div>
             </>
@@ -163,22 +165,18 @@ export default function TransactionDetailSheet({
                     href={transaction.receiptUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-md border border-border p-3 transition-colors hover:bg-muted/50"
+                    className="border-border hover:bg-muted/50 flex items-center gap-2 rounded-md border p-3 transition-colors"
                   >
-                    <Receipt className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">View PDF</span>
+                    <Receipt className="text-muted-foreground h-4 w-4" />
+                    <span className="text-muted-foreground text-sm">View PDF</span>
                   </a>
                 ) : (
-                  <a
-                    href={transaction.receiptUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
+                  <a href={transaction.receiptUrl} target="_blank" rel="noopener noreferrer">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={transaction.receiptUrl}
                       alt="Receipt"
-                      className="w-full rounded-md border border-border object-contain"
+                      className="border-border w-full rounded-md border object-contain"
                     />
                   </a>
                 )}
@@ -188,11 +186,12 @@ export default function TransactionDetailSheet({
 
           {/* Meta info */}
           <Separator />
-          <div className="space-y-2 text-xs text-muted-foreground">
+          <div className="text-muted-foreground space-y-2 text-xs">
             <div className="flex items-center gap-2">
               <CalendarDays className="h-3.5 w-3.5" />
               <span>
-                Added {new Date(transaction.createdAt).toLocaleDateString("en-US", {
+                Added{" "}
+                {new Date(transaction.createdAt).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
                   year: "numeric",
@@ -231,7 +230,7 @@ export default function TransactionDetailSheet({
                   transactionDescription={
                     transaction.isSettlement
                       ? `${transaction.payer.firstName} settled up`
-                      : (transaction.description ?? "Untitled expense")
+                      : transaction.title
                   }
                 />
               </div>

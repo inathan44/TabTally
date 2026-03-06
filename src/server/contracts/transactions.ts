@@ -5,7 +5,16 @@ import type { SafeUser } from "./users";
 export type SafeTransaction = Omit<
   Pick<
     Transaction,
-    "createdAt" | "createdById" | "description" | "id" | "isSettlement" | "payerId" | "updatedAt" | "transactionDate" | "category" | "receiptUrl"
+    | "createdAt"
+    | "createdById"
+    | "title"
+    | "id"
+    | "isSettlement"
+    | "payerId"
+    | "updatedAt"
+    | "transactionDate"
+    | "category"
+    | "receiptUrl"
   >,
   "amount"
 > & {

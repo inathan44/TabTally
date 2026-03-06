@@ -25,7 +25,6 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -85,7 +84,7 @@ export default function CreateTransactionModal({
   const defaultValues = isEditMode
     ? {
         amount: Math.abs(Number(editTransaction.amount)).toFixed(2),
-        description: editTransaction.description ?? "",
+        title: editTransaction.title,
         category: editTransaction.category ?? null,
         payerId: editTransaction.payerId,
         transactionDate: new Date(editTransaction.transactionDate),
@@ -96,7 +95,7 @@ export default function CreateTransactionModal({
       }
     : {
         amount: "",
-        description: "",
+        title: "",
         category: null as (typeof transactionCategories)[number] | null,
         payerId: "",
         transactionDate: new Date(),
@@ -206,7 +205,7 @@ export default function CreateTransactionModal({
       const basePayload = {
         groupId,
         amount: amountValue,
-        description: values.description,
+        title: values.title,
         category: values.category,
         receiptUrl: receipt.url,
         payerId: values.payerId,
@@ -287,13 +286,31 @@ export default function CreateTransactionModal({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="min-h-0 flex-1 space-y-6 overflow-y-auto"
           >
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel required>Title</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g., Dinner at Olive Garden, Rental car"
+                      maxLength={100}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Total Amount *</FormLabel>
+                    <FormLabel required>Total Amount</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <DollarSign className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
@@ -310,7 +327,7 @@ export default function CreateTransactionModal({
                 name="payerId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Who Paid? *</FormLabel>
+                    <FormLabel required>Who Paid?</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -335,7 +352,7 @@ export default function CreateTransactionModal({
                 name="transactionDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Transaction Date *</FormLabel>
+                    <FormLabel required>Transaction Date</FormLabel>
                     <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -368,24 +385,6 @@ export default function CreateTransactionModal({
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="What was this expense for? (e.g., Dinner at restaurant, Groceries, etc.)"
-                      className="min-h-[80px]"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField

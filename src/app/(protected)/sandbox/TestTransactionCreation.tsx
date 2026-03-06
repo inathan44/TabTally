@@ -33,7 +33,7 @@ export function TestTransactionCreation() {
       groupId: selectedGroupId,
       amount: 25.5,
       payerId: user.id,
-      description: "Mock lunch expense - testing transaction creation",
+      title: "Mock lunch expense - testing transaction creation",
       transactionDetails: [
         {
           recipientId: user.id,
@@ -67,7 +67,7 @@ export function TestTransactionCreation() {
       groupId: selectedGroupId,
       amount: totalAmount,
       payerId: user.id,
-      description: "Mock dinner expense - split between group members",
+      title: "Mock dinner expense - split between group members",
       transactionDetails: selectedGroup.groupUsers.map((groupUser) => ({
         recipientId: groupUser.id,
         amount: splitAmount,

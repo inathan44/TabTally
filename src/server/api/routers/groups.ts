@@ -308,7 +308,7 @@ export const groupRouter = createTRPCRouter({
         transactions: group.transactions.map((transaction) => ({
           id: transaction.id,
           amount: transaction.amount.toNumber(),
-          description: transaction.description,
+          title: transaction.title,
           category: transaction.category,
           receiptUrl: transaction.receiptUrl,
           isSettlement: transaction.isSettlement,
@@ -349,7 +349,7 @@ export const groupRouter = createTRPCRouter({
       if (input.search) {
         const term = input.search;
         where.OR = [
-          { description: { contains: term, mode: "insensitive" } },
+          { title: { contains: term, mode: "insensitive" } },
           { payer: { firstName: { contains: term, mode: "insensitive" } } },
           { payer: { lastName: { contains: term, mode: "insensitive" } } },
           {
@@ -443,7 +443,7 @@ export const groupRouter = createTRPCRouter({
       const mapped: SafeTransaction[] = transactions.map((transaction) => ({
         id: transaction.id,
         amount: transaction.amount.toNumber(),
-        description: transaction.description,
+        title: transaction.title,
         category: transaction.category,
         receiptUrl: transaction.receiptUrl,
         isSettlement: transaction.isSettlement,
@@ -1262,7 +1262,7 @@ export const groupRouter = createTRPCRouter({
             data: {
               groupId: input.groupId,
               amount: input.amount,
-              description: input.description ?? null,
+              title: input.title,
               category: input.category ?? null,
               receiptUrl: input.receiptUrl ?? null,
               transactionDate: input.transactionDate,
@@ -1345,7 +1345,7 @@ export const groupRouter = createTRPCRouter({
             data: {
               groupId: input.groupId,
               amount: -input.amount,
-              description: "Settlement",
+              title: "Settlement",
               isSettlement: true,
               transactionDate: new Date(),
               payerId: input.payerId,
@@ -1477,7 +1477,7 @@ export const groupRouter = createTRPCRouter({
             where: { id: input.transactionId },
             data: {
               amount: input.amount,
-              description: input.description ?? null,
+              title: input.title,
               category: input.category ?? null,
               receiptUrl: input.receiptUrl ?? null,
               transactionDate: input.transactionDate,

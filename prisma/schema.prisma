@@ -94,7 +94,7 @@ model Transaction {
   payerId         String
   payer           User                 @relation("TransactionPayer", fields: [payerId], references: [id])
   amount          Decimal              @db.Decimal(10, 2)
-  description     String?              @db.VarChar(255)
+  title           String               @db.VarChar(100)
   category        TransactionCategory?
   receiptUrl      String?              @db.VarChar(500)
   isSettlement    Boolean              @default(false)
