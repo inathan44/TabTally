@@ -1012,7 +1012,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           amount: 100,
           payerId: USER_ID,
-          description: "Dinner",
+          title: "Dinner",
           category: "FOOD",
           transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 100 }],
         });
@@ -1029,6 +1029,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           amount: 90,
           payerId: USER_ID,
+          title: "Test transaction",
           transactionDetails: [
             { recipientId: OTHER_USER_ID, amount: 45 },
             { recipientId: THIRD_USER_ID, amount: 45 },
@@ -1047,6 +1048,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           amount: 100,
           payerId: USER_ID,
+          title: "Test transaction",
           transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
         });
 
@@ -1063,6 +1065,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           amount: 100,
           payerId: USER_ID,
+          title: "Test transaction",
           transactionDetails: [
             { recipientId: OTHER_USER_ID, amount: 50 },
             { recipientId: OTHER_USER_ID, amount: 50 },
@@ -1082,6 +1085,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           amount: 50,
           payerId: "non-existent-payer",
+          title: "Test transaction",
           transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
         });
 
@@ -1098,6 +1102,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           amount: 50,
           payerId: USER_ID,
+          title: "Test transaction",
           transactionDetails: [{ recipientId: "non-member-recipient", amount: 50 }],
         });
 
@@ -1118,6 +1123,7 @@ describe("groupRouter", () => {
             groupId: group.id,
             amount: 50,
             payerId: THIRD_USER_ID,
+            title: "Test transaction",
             transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
           }),
         ).rejects.toThrow(TRPCError);
@@ -1132,7 +1138,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           amount: 80,
           payerId: OTHER_USER_ID,
-          description: "Other paid",
+          title: "Other paid",
           transactionDetails: [{ recipientId: USER_ID, amount: 80 }],
         });
 
@@ -1148,6 +1154,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           amount: 25,
           payerId: USER_ID,
+          title: "Test transaction",
           transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 25 }],
         });
 
@@ -1252,6 +1259,7 @@ describe("groupRouter", () => {
             amount: 100,
             payerId: USER_ID,
             createdById: USER_ID,
+            title: "Test transaction",
             transactionDetails: {
               create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 100 },
             },
@@ -1263,6 +1271,7 @@ describe("groupRouter", () => {
           transactionId: txn.id,
           amount: 200,
           payerId: USER_ID,
+          title: "Test transaction",
           transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 200 }],
         });
 
@@ -1284,6 +1293,7 @@ describe("groupRouter", () => {
             amount: 60,
             payerId: OTHER_USER_ID,
             createdById: OTHER_USER_ID,
+            title: "Test transaction",
             transactionDetails: {
               create: { recipientId: USER_ID, groupId: group.id, amount: 60 },
             },
@@ -1296,6 +1306,7 @@ describe("groupRouter", () => {
           transactionId: txn.id,
           amount: 80,
           payerId: OTHER_USER_ID,
+          title: "Test transaction",
           transactionDetails: [{ recipientId: USER_ID, amount: 80 }],
         });
 
@@ -1313,6 +1324,7 @@ describe("groupRouter", () => {
             amount: 50,
             payerId: USER_ID,
             createdById: USER_ID,
+            title: "Test transaction",
             transactionDetails: {
               create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
             },
@@ -1326,6 +1338,7 @@ describe("groupRouter", () => {
           transactionId: txn.id,
           amount: 50,
           payerId: USER_ID,
+          title: "Test transaction",
           transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
         });
 
@@ -1344,6 +1357,7 @@ describe("groupRouter", () => {
             amount: -50,
             payerId: USER_ID,
             createdById: USER_ID,
+            title: "Test transaction",
             isSettlement: true,
             transactionDetails: {
               create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: -50 },
@@ -1356,6 +1370,7 @@ describe("groupRouter", () => {
           transactionId: settlement.id,
           amount: 50,
           payerId: USER_ID,
+          title: "Test transaction",
           transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
         });
 
@@ -1373,6 +1388,7 @@ describe("groupRouter", () => {
           transactionId: 999999,
           amount: 50,
           payerId: USER_ID,
+          title: "Test transaction",
           transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
         });
 
@@ -1390,6 +1406,7 @@ describe("groupRouter", () => {
             amount: 100,
             payerId: USER_ID,
             createdById: USER_ID,
+            title: "Test transaction",
             transactionDetails: {
               create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 100 },
             },
@@ -1401,6 +1418,7 @@ describe("groupRouter", () => {
           transactionId: txn.id,
           amount: 100,
           payerId: USER_ID,
+          title: "Test transaction",
           transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 70 }],
         });
 
@@ -1421,6 +1439,7 @@ describe("groupRouter", () => {
             amount: 50,
             payerId: USER_ID,
             createdById: USER_ID,
+            title: "Test transaction",
             transactionDetails: {
               create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
             },
@@ -1448,6 +1467,7 @@ describe("groupRouter", () => {
             amount: 50,
             payerId: OTHER_USER_ID,
             createdById: OTHER_USER_ID,
+            title: "Test transaction",
             transactionDetails: {
               create: { recipientId: USER_ID, groupId: group.id, amount: 50 },
             },
@@ -1473,6 +1493,7 @@ describe("groupRouter", () => {
             amount: 50,
             payerId: USER_ID,
             createdById: USER_ID,
+            title: "Test transaction",
             transactionDetails: {
               create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
             },
@@ -1513,6 +1534,7 @@ describe("groupRouter", () => {
             amount: 50,
             payerId: USER_ID,
             createdById: USER_ID,
+            title: "Test transaction",
             deletedAt: new Date(),
             transactionDetails: {
               create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
@@ -1542,6 +1564,7 @@ describe("groupRouter", () => {
             amount: 50,
             payerId: USER_ID,
             createdById: USER_ID,
+            title: "Test transaction",
             deletedAt: new Date(),
             transactionDetails: {
               create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
@@ -1570,6 +1593,7 @@ describe("groupRouter", () => {
             amount: 50,
             payerId: USER_ID,
             createdById: USER_ID,
+            title: "Test transaction",
             deletedAt: new Date(),
             transactionDetails: {
               create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
@@ -1597,6 +1621,7 @@ describe("groupRouter", () => {
             amount: 50,
             payerId: USER_ID,
             createdById: USER_ID,
+            title: "Test transaction",
             transactionDetails: {
               create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
             },
@@ -1622,8 +1647,8 @@ describe("groupRouter", () => {
 
         await tx.transaction.createMany({
           data: [
-            { groupId: group.id, amount: 50, payerId: USER_ID, createdById: USER_ID },
-            { groupId: group.id, amount: 30, payerId: OTHER_USER_ID, createdById: OTHER_USER_ID },
+            { groupId: group.id, amount: 50, payerId: USER_ID, createdById: USER_ID , title: "Test transaction" },
+            { groupId: group.id, amount: 30, payerId: OTHER_USER_ID, createdById: OTHER_USER_ID , title: "Test transaction" },
           ],
         });
 
@@ -1640,12 +1665,13 @@ describe("groupRouter", () => {
 
         await tx.transaction.createMany({
           data: [
-            { groupId: group.id, amount: 50, payerId: USER_ID, createdById: USER_ID },
+            { groupId: group.id, amount: 50, payerId: USER_ID, createdById: USER_ID , title: "Test transaction" },
             {
               groupId: group.id,
               amount: 30,
               payerId: USER_ID,
               createdById: USER_ID,
+              title: "Test transaction",
               deletedAt: new Date(),
             },
           ],
@@ -1669,6 +1695,7 @@ describe("groupRouter", () => {
               amount: 50,
               payerId: USER_ID,
               createdById: USER_ID,
+              title: "Test transaction",
               category: "FOOD",
             },
             {
@@ -1676,6 +1703,7 @@ describe("groupRouter", () => {
               amount: 30,
               payerId: USER_ID,
               createdById: USER_ID,
+              title: "Test transaction",
               category: "TRAVEL",
             },
           ],
@@ -1698,8 +1726,8 @@ describe("groupRouter", () => {
 
         await tx.transaction.createMany({
           data: [
-            { groupId: group.id, amount: 50, payerId: USER_ID, createdById: USER_ID },
-            { groupId: group.id, amount: 30, payerId: OTHER_USER_ID, createdById: OTHER_USER_ID },
+            { groupId: group.id, amount: 50, payerId: USER_ID, createdById: USER_ID , title: "Test transaction" },
+            { groupId: group.id, amount: 30, payerId: OTHER_USER_ID, createdById: OTHER_USER_ID , title: "Test transaction" },
           ],
         });
 
@@ -1725,6 +1753,7 @@ describe("groupRouter", () => {
               amount: 50,
               payerId: USER_ID,
               createdById: USER_ID,
+              title: "Test transaction",
               transactionDate: new Date("2025-01-15"),
             },
             {
@@ -1732,6 +1761,7 @@ describe("groupRouter", () => {
               amount: 30,
               payerId: USER_ID,
               createdById: USER_ID,
+              title: "Test transaction",
               transactionDate: new Date("2025-06-15"),
             },
           ],
@@ -1748,7 +1778,7 @@ describe("groupRouter", () => {
       }, USER_ID);
     });
 
-    it("searches by description", async () => {
+    it("searches by title", async () => {
       await withTestContext(async ({ caller, tx, callerAs }) => {
         const group = await seedGroupWithMembers({ caller, tx, callerAs });
 
@@ -1759,14 +1789,14 @@ describe("groupRouter", () => {
               amount: 50,
               payerId: USER_ID,
               createdById: USER_ID,
-              description: "Pizza night",
+              title: "Pizza night",
             },
             {
               groupId: group.id,
               amount: 30,
               payerId: USER_ID,
               createdById: USER_ID,
-              description: "Gas station",
+              title: "Gas station",
             },
           ],
         });
@@ -1792,6 +1822,7 @@ describe("groupRouter", () => {
               amount: 50,
               payerId: USER_ID,
               createdById: USER_ID,
+              title: "Test transaction",
               category: "FOOD",
             },
             {
@@ -1799,6 +1830,7 @@ describe("groupRouter", () => {
               amount: 30,
               payerId: USER_ID,
               createdById: USER_ID,
+              title: "Test transaction",
               category: "TRAVEL",
             },
           ],
