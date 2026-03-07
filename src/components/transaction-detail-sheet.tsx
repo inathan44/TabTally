@@ -15,7 +15,6 @@ import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import DeleteTransactionDialog from "~/components/delete-transaction-dialog";
 import { transactionCategoryLabels } from "~/server/contracts/groups";
 import type { SafeTransaction } from "~/server/contracts/transactions";
-import type { TransactionCategory } from "@prisma/client";
 import { cn } from "~/lib/utils";
 
 interface TransactionDetailSheetProps {
@@ -76,7 +75,7 @@ export default function TransactionDetailSheet({
             </p>
             {transaction.category && (
               <Badge variant="secondary" className="mt-2">
-                {transactionCategoryLabels[transaction.category as TransactionCategory]}
+                {transactionCategoryLabels[transaction.category]}
               </Badge>
             )}
           </div>
