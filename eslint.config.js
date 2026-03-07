@@ -15,6 +15,11 @@ const config = [
   ...tseslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
+  // Disable type-checked rules for JS files (no type information available)
+  {
+    files: ["**/*.js", "**/*.mjs", "**/*.cjs"],
+    ...tseslint.configs.disableTypeChecked,
+  },
   // TypeScript-specific overrides
   {
     files: ["**/*.ts", "**/*.tsx"],

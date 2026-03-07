@@ -35,8 +35,8 @@ describe("Balance Calculation", () => {
         },
       ]);
       expect(result.userBalances.A!.netBalance).toBeCloseTo(20);
-      expect(result.userBalances["B"]!.netBalance).toBeCloseTo(-10);
-      expect(result.userBalances["C"]!.netBalance).toBeCloseTo(-10);
+      expect(result.userBalances.B!.netBalance).toBeCloseTo(-10);
+      expect(result.userBalances.C!.netBalance).toBeCloseTo(-10);
     });
   });
 
@@ -205,9 +205,9 @@ describe("Balance Calculation", () => {
       // A: paid 10, owes 15, net = -5
       // B: paid 20, owes 15, net = +5
       // C: paid 15, owes 15, net = 0
-      expect(result.userBalances["A"]!.netBalance).toBeCloseTo(-5);
-      expect(result.userBalances["B"]!.netBalance).toBeCloseTo(5);
-      expect(result.userBalances["C"]!.netBalance).toBeCloseTo(0);
+      expect(result.userBalances.A!.netBalance).toBeCloseTo(-5);
+      expect(result.userBalances.B!.netBalance).toBeCloseTo(5);
+      expect(result.userBalances.C!.netBalance).toBeCloseTo(0);
       expect(result.settlementPlan).toHaveLength(1);
       expect(result.settlementPlan[0]).toEqual({ fromUserId: "A", toUserId: "B", amount: 5 });
     });

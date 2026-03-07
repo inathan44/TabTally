@@ -15,7 +15,6 @@ import { api } from "~/trpc/react";
 import type { GetGroupResponse } from "~/server/contracts/groups";
 import { transactionCategoryLabels, transactionCategories } from "~/server/contracts/groups";
 import type { SafeTransaction } from "~/server/contracts/transactions";
-import type { TransactionCategory } from "@prisma/client";
 import { cn } from "~/lib/utils";
 
 interface TransactionsTabProps {
@@ -190,7 +189,7 @@ export default function TransactionsTab({
                         </p>
                         {transaction.category && (
                           <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
-                            {transactionCategoryLabels[transaction.category as TransactionCategory]}
+                            {transactionCategoryLabels[transaction.category]}
                           </Badge>
                         )}
                         {transaction.receiptUrl && (
