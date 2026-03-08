@@ -460,16 +460,29 @@ function computeSplits(
   // Distribute tax and tip proportionally
   const allClaimedTotal = Array.from(memberTotals.values()).reduce((sum, v) => sum + v, 0);
 
-  return groupMembers
-    .filter((m) => memberTotals.has(m.id))
-    .map((m) => {
-      const itemsTotal = memberTotals.get(m.id) ?? 0;
-      const proportion = allClaimedTotal > 0 ? itemsTotal / allClaimedTotal : 0;
-      const taxShare = receiptData.tax * proportion;
-      const tipShare = receiptData.tip * proportion;
-      const total = Math.round((itemsTotal + taxShare + tipShare) * 100) / 100;
-      return { recipientId: m.id, amount: total };
-    });
+  const members = groupMembers.filter((m) => memberTotals.has(m.id));
+  const rawCents = members.map((m) => {
+    const itemsTotal = memberTotals.get(m.id) ?? 0;
+    const proportion = allClaimedTotal > 0 ? itemsTotal / allClaimedTotal : 0;
+    const taxShare = receiptData.tax * proportion;
+    const tipShare = receiptData.tip * proportion;
+    return Math.round((itemsTotal + taxShare + tipShare) * 100);
+  });
+
+  // Distribute rounding remainder so splits sum to exactly the receipt total
+  const expectedTotalCents = Math.round(receiptData.total * 100);
+  const currentSum = rawCents.reduce((sum, c) => sum + c, 0);
+  let remainder = expectedTotalCents - currentSum;
+  const step = remainder > 0 ? 1 : -1;
+  for (let i = 0; remainder !== 0 && i < rawCents.length; i++) {
+    rawCents[i]! += step;
+    remainder -= step;
+  }
+
+  return members.map((m, i) => ({
+    recipientId: m.id,
+    amount: rawCents[i]! / 100,
+  }));
 }
 
 /** Compute full breakdown for display */
@@ -501,16 +514,32 @@ function computeBreakdown(
     });
   });
 
-  const perPersonBreakdown = groupMembers
-    .filter((m) => memberItemTotals.has(m.id))
-    .map((m) => {
-      const itemsTotal = memberItemTotals.get(m.id) ?? 0;
-      const proportion = claimedItemsTotal > 0 ? itemsTotal / claimedItemsTotal : 0;
-      const taxShare = receiptData.tax * proportion;
-      const tipShare = receiptData.tip * proportion;
-      const total = Math.round((itemsTotal + taxShare + tipShare) * 100) / 100;
-      return { member: m, itemsTotal, taxShare, tipShare, total };
-    });
+  const members = groupMembers.filter((m) => memberItemTotals.has(m.id));
+  const rawBreakdown = members.map((m) => {
+    const itemsTotal = memberItemTotals.get(m.id) ?? 0;
+    const proportion = claimedItemsTotal > 0 ? itemsTotal / claimedItemsTotal : 0;
+    const taxShare = receiptData.tax * proportion;
+    const tipShare = receiptData.tip * proportion;
+    return { member: m, itemsTotal, taxShare, tipShare, rawCents: Math.round((itemsTotal + taxShare + tipShare) * 100) };
+  });
+
+  // Distribute rounding remainder so displayed totals sum to the receipt total
+  const expectedTotalCents = Math.round(receiptData.total * 100);
+  const currentSum = rawBreakdown.reduce((sum, b) => sum + b.rawCents, 0);
+  let remainder = expectedTotalCents - currentSum;
+  const step = remainder > 0 ? 1 : -1;
+  for (let i = 0; remainder !== 0 && i < rawBreakdown.length; i++) {
+    rawBreakdown[i]!.rawCents += step;
+    remainder -= step;
+  }
+
+  const perPersonBreakdown = rawBreakdown.map((b) => ({
+    member: b.member,
+    itemsTotal: b.itemsTotal,
+    taxShare: b.taxShare,
+    tipShare: b.tipShare,
+    total: b.rawCents / 100,
+  }));
 
   return { perPersonBreakdown, unclaimedItems, unclaimedTotal };
 }

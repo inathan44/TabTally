@@ -2,21 +2,24 @@ import { describe, it, expect } from "vitest";
 import { calculateGroupBalances, generateSettlementPlan } from "./balanceCalculation";
 import type { UserBalance } from "~/server/contracts/balances";
 
-// Helper: verify all balances are settled after applying settlements
+// Helper: verify all balances are exactly settled after applying settlements.
+// Settlements must fully zero out every person's balance — no tolerance.
 function verifySettlements(
   balances: Record<string, UserBalance>,
   settlements: ReturnType<typeof generateSettlementPlan>,
 ) {
-  const netAfter: Record<string, number> = {};
+  // Work in integer cents to avoid floating-point comparison issues
+  const netCentsAfter: Record<string, number> = {};
   Object.entries(balances).forEach(([id, b]) => {
-    netAfter[id] = b.netBalance;
+    netCentsAfter[id] = Math.round(b.netBalance * 100);
   });
   settlements.forEach((s) => {
-    netAfter[s.fromUserId] = (netAfter[s.fromUserId] ?? 0) + s.amount;
-    netAfter[s.toUserId] = (netAfter[s.toUserId] ?? 0) - s.amount;
+    const amountCents = Math.round(s.amount * 100);
+    netCentsAfter[s.fromUserId] = (netCentsAfter[s.fromUserId] ?? 0) + amountCents;
+    netCentsAfter[s.toUserId] = (netCentsAfter[s.toUserId] ?? 0) - amountCents;
   });
-  Object.values(netAfter).forEach((val) => {
-    expect(Math.abs(val)).toBeLessThan(0.02);
+  Object.entries(netCentsAfter).forEach(([userId, cents]) => {
+    expect(cents, `${userId} has ${cents}¢ remaining after settlements`).toBe(0);
   });
 }
 
@@ -253,6 +256,97 @@ describe("Balance Calculation", () => {
       const totalSettled = result.settlementPlan.reduce((sum, s) => sum + s.amount, 0);
       expect(totalSettled).toBeCloseTo(66.67);
     });
+
+    it("does not hang on uneven 3-way split ($10 / 3) and settles exactly", () => {
+      // Production bug scenario (ponyo-7): $10 split as $3.33 each = $9.99.
+      // Net in cents: A=+667, B=-333, C=-333 → sum=+1¢
+      // The algorithm must not hang and must assign the extra penny.
+      const result = calculateGroupBalances([
+        {
+          payerId: "A",
+          amount: 10,
+          transactionDetails: [
+            { recipientId: "A", amount: 3.33 },
+            { recipientId: "B", amount: 3.33 },
+            { recipientId: "C", amount: 3.33 },
+          ],
+        },
+      ]);
+      expect(result.settlementPlan).toHaveLength(2);
+      verifySettlements(result.userBalances, result.settlementPlan);
+    }, 2000);
+
+    it("does not hang on uneven 3-way split ($1 / 3) and settles exactly", () => {
+      // $1 split 3 ways: 0.33 each = $0.99, 1¢ gap
+      const result = calculateGroupBalances([
+        {
+          payerId: "A",
+          amount: 1,
+          transactionDetails: [
+            { recipientId: "A", amount: 0.33 },
+            { recipientId: "B", amount: 0.33 },
+            { recipientId: "C", amount: 0.33 },
+          ],
+        },
+      ]);
+      expect(result.settlementPlan).toHaveLength(2);
+      verifySettlements(result.userBalances, result.settlementPlan);
+    }, 2000);
+
+    it("does not hang on uneven 7-way split", () => {
+      // $100 split 7 ways with proper penny distribution: 14.29×4 + 14.28×3 = 100.00
+      const details = Array.from({ length: 7 }, (_, i) => ({
+        recipientId: String.fromCharCode(65 + i), // A-G
+        amount: i < 4 ? 14.29 : 14.28,
+      }));
+      const result = calculateGroupBalances([
+        { payerId: "A", amount: 100, transactionDetails: details },
+      ]);
+      expect(result.settlementPlan.length).toBeGreaterThan(0);
+      verifySettlements(result.userBalances, result.settlementPlan);
+    }, 2000);
+
+    it("does not hang with multiple uneven transactions compounding rounding", () => {
+      // Two transactions with proper penny distribution (as computeSplits now produces).
+      // $10 / 3: [3.34, 3.33, 3.33], $7 / 3: [2.34, 2.33, 2.33]
+      const result = calculateGroupBalances([
+        {
+          payerId: "A",
+          amount: 10,
+          transactionDetails: [
+            { recipientId: "A", amount: 3.34 },
+            { recipientId: "B", amount: 3.33 },
+            { recipientId: "C", amount: 3.33 },
+          ],
+        },
+        {
+          payerId: "B",
+          amount: 7,
+          transactionDetails: [
+            { recipientId: "A", amount: 2.34 },
+            { recipientId: "B", amount: 2.33 },
+            { recipientId: "C", amount: 2.33 },
+          ],
+        },
+      ]);
+      expect(result.settlementPlan.length).toBeGreaterThanOrEqual(1);
+      verifySettlements(result.userBalances, result.settlementPlan);
+    }, 2000);
+
+    it("does not hang on non-zero-sum balances from rounding (legacy data safety)", () => {
+      // Legacy data where splits don't sum exactly to the transaction total.
+      // A paid $10, split 3 ways at $3.33 each (total = $9.99, 1 cent gap).
+      // Net in cents: A=+667, B=-333, C=-333 → sum=+1¢
+      // Algorithm must not hang and must settle every cent exactly.
+      const balances: Record<string, UserBalance> = {
+        A: { totalPaid: 10, totalOwed: 3.33, netBalance: 6.67 },
+        B: { totalPaid: 0, totalOwed: 3.33, netBalance: -3.33 },
+        C: { totalPaid: 0, totalOwed: 3.33, netBalance: -3.33 },
+      };
+      const settlements = generateSettlementPlan(balances);
+      expect(settlements).toHaveLength(2);
+      verifySettlements(balances, settlements);
+    }, 2000);
 
     it("handles 8-person dinner scenario", () => {
       // Realistic: 3 people paid for different things, 8 people split

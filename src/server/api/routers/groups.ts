@@ -1939,9 +1939,12 @@ function verifyTransactionDetails(
     return false;
   }
 
-  const totalAmount = transactionDetails.reduce((sum, detail) => sum + detail.amount, 0);
-  if (Math.abs(totalAmount - transactionAmount) > 0.01) {
-    console.error("Total amount of transaction details does not match transaction amount");
+  const totalCents = transactionDetails.reduce((sum, detail) => sum + Math.round(detail.amount * 100), 0);
+  const expectedCents = Math.round(transactionAmount * 100);
+  if (totalCents !== expectedCents) {
+    console.error(
+      `[verifyTransactionDetails] Split total (${totalCents}¢) does not match transaction amount (${expectedCents}¢)`,
+    );
     return false;
   }
 
