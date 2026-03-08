@@ -241,10 +241,11 @@ export default function CreateTransactionModal({
         amount: parseFloat(split.amount),
       }));
 
-      const totalSplitAmount = splitValues.reduce((sum, split) => sum + split.amount, 0);
-      if (Math.abs(totalSplitAmount - amountValue) > 0.01) {
+      const totalSplitCents = splitValues.reduce((sum, split) => sum + Math.round(split.amount * 100), 0);
+      const totalAmountCents = Math.round(amountValue * 100);
+      if (totalSplitCents !== totalAmountCents) {
         setTransactionError(
-          `Split amounts ($${totalSplitAmount.toFixed(2)}) must equal the total amount ($${amountValue.toFixed(2)})`,
+          `Split amounts ($${(totalSplitCents / 100).toFixed(2)}) must equal the total amount ($${amountValue.toFixed(2)})`,
         );
         return;
       }
