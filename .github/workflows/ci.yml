@@ -55,6 +55,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tabtally_test
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/tabtally_test
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tabtally_test
       SKIP_ENV_VALIDATION: true
       BYPASS_AUTH: true
