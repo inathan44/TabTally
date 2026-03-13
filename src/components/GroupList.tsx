@@ -90,7 +90,7 @@ export function GroupList({ className }: GroupListProps) {
               id={group.id.toString()}
               name={group.name}
               slug={group.slug}
-              balance={group.userBalance?.amount ?? 0}
+              balance={group.userBalance?.amount.cents ?? 0}
               balanceType={group.userBalance?.type ?? "receive"}
               isOwner={group.createdById == userId}
             />

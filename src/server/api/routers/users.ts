@@ -15,6 +15,7 @@ import {
   searchUsersSchema,
 } from "~/server/contracts/users";
 import { calculateGroupBalances } from "~/server/helpers/balanceCalculation";
+import { toMoney } from "~/lib/money";
 
 export const userRouter = createTRPCRouter({
   getProfile: protectedProcedure.query(async ({ ctx }): Promise<ApiResponse<UserProfile>> => {
@@ -250,29 +251,26 @@ export const userRouter = createTRPCRouter({
 
       const userGroups: GetUserGroupsResponse[] = groups.map((group) => {
         // Calculate balance for this group for the current user
-        let userBalance: { amount: number; type: "receive" | "pay" } | undefined;
+        let userBalance: GetUserGroupsResponse["userBalance"];
 
         if (group.transactions.length > 0) {
-          // Transform transactions for balance calculation
           const transformedTransactions = group.transactions.map((transaction) => ({
             payerId: transaction.payerId,
-            amount: transaction.amount.toNumber(),
+            amount: transaction.amount,
             transactionDetails: transaction.transactionDetails.map((detail) => ({
               recipientId: detail.recipientId,
-              amount: detail.amount.toNumber(),
+              amount: detail.amount,
             })),
           }));
 
-          // Calculate balances using helper method
           const balanceData = calculateGroupBalances(transformedTransactions);
           const currentUserBalance = balanceData.userBalances[ctx.userId];
 
           if (currentUserBalance) {
             const netBalance = currentUserBalance.netBalance;
-            if (Math.abs(netBalance) > 0.01) {
-              // Only show balance if significant
+            if (Math.abs(netBalance) > 0) {
               userBalance = {
-                amount: Math.abs(netBalance),
+                amount: toMoney(Math.abs(netBalance)),
                 type: netBalance > 0 ? "receive" : "pay",
               };
             }

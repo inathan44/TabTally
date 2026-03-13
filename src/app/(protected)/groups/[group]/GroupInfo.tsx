@@ -114,7 +114,7 @@ export default function GroupInfo({ groupSlug }: GroupInfoProps) {
   const totalSpending =
     group.transactions
       ?.filter((t) => !t.isSettlement)
-      .reduce((sum, t) => sum + Number(t.amount), 0) ?? 0;
+      .reduce((sum, t) => sum + Math.abs(t.amount.cents), 0) ?? 0;
   const joinedCount = group.members.filter((m) => m.status === "JOINED").length;
   const invitedCount = group.members.filter((m) => m.status === "INVITED").length;
   const transactionCount = group.transactions?.length ?? 0;

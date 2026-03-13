@@ -6,6 +6,7 @@ import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AlertTriangle, Plus, Trash2, Pencil, Check } from "lucide-react";
+import { formatDollars, toCents, centsToDollarFloat } from "~/lib/money";
 import type { ReceiptData, ReceiptItem } from "~/server/contracts/receipt";
 import type { GroupMember } from "~/server/contracts/groups";
 
@@ -33,7 +34,7 @@ export default function ItemizedSplit({
 
   // Detect mismatch between computed item subtotal and the receipt's reported subtotal
   const itemsSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const subtotalMismatch = Math.abs(itemsSubtotal - receiptData.subtotal) > 0.01;
+  const subtotalMismatch = Math.abs(itemsSubtotal - receiptData.subtotal) > 1;
 
   const buildLocalReceiptData = useCallback(
     (currentItems: ReceiptItem[]): ReceiptData => {
@@ -167,8 +168,8 @@ export default function ItemizedSplit({
         <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            <span className="font-medium">Parsing mismatch detected.</span> Items total $
-            {itemsSubtotal.toFixed(2)} but receipt subtotal is ${receiptData.subtotal.toFixed(2)}.
+            <span className="font-medium">Parsing mismatch detected.</span> Items total{" "}
+            {formatDollars(itemsSubtotal)} but receipt subtotal is {formatDollars(receiptData.subtotal)}.
             Please review and adjust items below.
           </div>
         </div>
@@ -237,9 +238,9 @@ export default function ItemizedSplit({
                         <Input
                           type="number"
                           step="0.01"
-                          value={item.price}
+                          value={centsToDollarFloat(item.price)}
                           onChange={(e) =>
-                            updateItem(itemIndex, { price: parseFloat(e.target.value) || 0 })
+                            updateItem(itemIndex, { price: toCents(parseFloat(e.target.value) || 0) })
                           }
                           className="h-7 text-sm"
                         />
@@ -285,7 +286,7 @@ export default function ItemizedSplit({
                       </span>
                     </div>
                     <div className="ml-2 flex shrink-0 items-center gap-1">
-                      <span className="text-sm font-medium">${itemTotal.toFixed(2)}</span>
+                      <span className="text-sm font-medium">{formatDollars(itemTotal)}</span>
                       <Button
                         type="button"
                         variant="ghost"
@@ -368,8 +369,7 @@ export default function ItemizedSplit({
         <div className="flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-2.5 text-sm text-yellow-700">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>
-            {unclaimedItems} unclaimed {unclaimedItems === 1 ? "item" : "items"} ($
-            {unclaimedTotal.toFixed(2)})
+            {unclaimedItems} unclaimed {unclaimedItems === 1 ? "item" : "items"} ({formatDollars(unclaimedTotal)})
           </span>
         </div>
       )}
@@ -379,24 +379,24 @@ export default function ItemizedSplit({
         <div className="text-muted-foreground flex justify-between">
           <span>Items Subtotal</span>
           <span className={cn(subtotalMismatch && "font-medium text-amber-600")}>
-            ${itemsSubtotal.toFixed(2)}
+            {formatDollars(itemsSubtotal)}
           </span>
         </div>
         {localReceiptData.tax > 0 && (
           <div className="text-muted-foreground flex justify-between">
             <span>Tax</span>
-            <span>${localReceiptData.tax.toFixed(2)}</span>
+            <span>{formatDollars(localReceiptData.tax)}</span>
           </div>
         )}
         {localReceiptData.tip > 0 && (
           <div className="text-muted-foreground flex justify-between">
             <span>Tip</span>
-            <span>${localReceiptData.tip.toFixed(2)}</span>
+            <span>{formatDollars(localReceiptData.tip)}</span>
           </div>
         )}
         <div className="border-border flex justify-between border-t pt-1 font-medium">
           <span>Total</span>
-          <span>${(itemsSubtotal + localReceiptData.tax + localReceiptData.tip).toFixed(2)}</span>
+          <span>{formatDollars(itemsSubtotal + localReceiptData.tax + localReceiptData.tip)}</span>
         </div>
       </div>
 
@@ -420,13 +420,13 @@ export default function ItemizedSplit({
                   <div>
                     <span className="text-sm font-medium">{member.firstName}</span>
                     <span className="text-muted-foreground ml-1.5 text-xs">
-                      ${itemsTotal.toFixed(2)}
-                      {taxShare > 0 && ` + $${taxShare.toFixed(2)} tax`}
-                      {tipShare > 0 && ` + $${tipShare.toFixed(2)} tip`}
+                      {formatDollars(itemsTotal)}
+                      {taxShare > 0 && ` + ${formatDollars(taxShare)} tax`}
+                      {tipShare > 0 && ` + ${formatDollars(tipShare)} tip`}
                     </span>
                   </div>
                 </div>
-                <span className="text-sm font-semibold">${total.toFixed(2)}</span>
+                <span className="text-sm font-semibold">{formatDollars(total)}</span>
               </div>
             ))}
           </div>
@@ -436,7 +436,7 @@ export default function ItemizedSplit({
   );
 }
 
-/** Compute per-person splits with proportional tax/tip */
+/** Compute per-person splits with proportional tax/tip — all values in cents */
 function computeSplits(
   receiptData: ReceiptData,
   groupMembers: GroupMember[],
@@ -444,7 +444,7 @@ function computeSplits(
 ): { recipientId: string; amount: number }[] {
   const memberTotals = new Map<string, number>();
 
-  // Sum each member's claimed item totals
+  // Sum each member's claimed item totals (cents)
   receiptData.items.forEach((item, itemIndex) => {
     const assignees = assignments.get(itemIndex);
     if (!assignees || assignees.size === 0) return;
@@ -466,13 +466,12 @@ function computeSplits(
     const proportion = allClaimedTotal > 0 ? itemsTotal / allClaimedTotal : 0;
     const taxShare = receiptData.tax * proportion;
     const tipShare = receiptData.tip * proportion;
-    return Math.round((itemsTotal + taxShare + tipShare) * 100);
+    return Math.round(itemsTotal + taxShare + tipShare);
   });
 
   // Distribute rounding remainder so splits sum to exactly the receipt total
-  const expectedTotalCents = Math.round(receiptData.total * 100);
   const currentSum = rawCents.reduce((sum, c) => sum + c, 0);
-  let remainder = expectedTotalCents - currentSum;
+  let remainder = receiptData.total - currentSum;
   const step = remainder > 0 ? 1 : -1;
   for (let i = 0; remainder !== 0 && i < rawCents.length; i++) {
     rawCents[i]! += step;
@@ -481,11 +480,11 @@ function computeSplits(
 
   return members.map((m, i) => ({
     recipientId: m.id,
-    amount: rawCents[i]! / 100,
+    amount: rawCents[i]!,
   }));
 }
 
-/** Compute full breakdown for display */
+/** Compute full breakdown for display — all values in cents */
 function computeBreakdown(
   receiptData: ReceiptData,
   groupMembers: GroupMember[],
@@ -518,15 +517,14 @@ function computeBreakdown(
   const rawBreakdown = members.map((m) => {
     const itemsTotal = memberItemTotals.get(m.id) ?? 0;
     const proportion = claimedItemsTotal > 0 ? itemsTotal / claimedItemsTotal : 0;
-    const taxShare = receiptData.tax * proportion;
-    const tipShare = receiptData.tip * proportion;
-    return { member: m, itemsTotal, taxShare, tipShare, rawCents: Math.round((itemsTotal + taxShare + tipShare) * 100) };
+    const taxShare = Math.round(receiptData.tax * proportion);
+    const tipShare = Math.round(receiptData.tip * proportion);
+    return { member: m, itemsTotal: Math.round(itemsTotal), taxShare, tipShare, rawCents: Math.round(itemsTotal + taxShare + tipShare) };
   });
 
   // Distribute rounding remainder so displayed totals sum to the receipt total
-  const expectedTotalCents = Math.round(receiptData.total * 100);
   const currentSum = rawBreakdown.reduce((sum, b) => sum + b.rawCents, 0);
-  let remainder = expectedTotalCents - currentSum;
+  let remainder = receiptData.total - currentSum;
   const step = remainder > 0 ? 1 : -1;
   for (let i = 0; remainder !== 0 && i < rawBreakdown.length; i++) {
     rawBreakdown[i]!.rawCents += step;
@@ -538,7 +536,7 @@ function computeBreakdown(
     itemsTotal: b.itemsTotal,
     taxShare: b.taxShare,
     tipShare: b.tipShare,
-    total: b.rawCents / 100,
+    total: b.rawCents,
   }));
 
   return { perPersonBreakdown, unclaimedItems, unclaimedTotal };

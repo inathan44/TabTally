@@ -8,6 +8,7 @@ import { FormControl, FormField, FormItem, FormMessage } from "~/components/ui/f
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { DollarSign } from "lucide-react";
 import { cn } from "~/lib/utils";
+import { dollarsToCents, formatDollars, parseDollarsToCents } from "~/lib/money";
 import type { GroupMember } from "~/server/contracts/groups";
 import { createTransactionFormSchema } from "~/server/contracts/groups";
 
@@ -36,12 +37,12 @@ export default function TransactionCustomSplit({
   const allSelected =
     groupMembers.length > 0 && groupMembers.every((m) => selectedMemberIds.has(m.id));
 
-  const totalSplitAmount = watchedSplits.reduce(
-    (sum, split) => sum + (parseFloat(split.amount) || 0),
+  const totalSplitCents = watchedSplits.reduce(
+    (sum, split) => sum + parseDollarsToCents(split.amount || "0"),
     0,
   );
-  const amountValue = parseFloat(watchedAmount || "0");
-  const amountDifference = amountValue - totalSplitAmount;
+  const amountCents = parseDollarsToCents(watchedAmount || "0");
+  const diffCents = amountCents - totalSplitCents;
 
   const getMemberById = (id: string) => groupMembers.find((m) => m.id === id);
 
@@ -57,7 +58,7 @@ export default function TransactionCustomSplit({
             variant="outline"
             size="sm"
             onClick={equalSplit}
-            disabled={!watchedAmount || parseFloat(watchedAmount) <= 0}
+            disabled={!watchedAmount || parseDollarsToCents(watchedAmount) <= 0}
           >
             Split Evenly
           </Button>
@@ -152,32 +153,32 @@ export default function TransactionCustomSplit({
       )}
 
       {/* Amount validation display */}
-      {amountValue > 0 && fields.length > 0 && (
+      {amountCents > 0 && fields.length > 0 && (
         <div
           className={cn("rounded-lg border p-3 text-sm", {
-            "border-green-200 bg-green-50 text-green-700": Math.abs(amountDifference) < 0.01,
-            "border-yellow-200 bg-yellow-50 text-yellow-700": Math.abs(amountDifference) >= 0.01,
+            "border-green-200 bg-green-50 text-green-700": diffCents === 0,
+            "border-yellow-200 bg-yellow-50 text-yellow-700": diffCents !== 0,
           })}
         >
           <div className="flex justify-between">
             <span>Total Amount:</span>
-            <span>${amountValue.toFixed(2)}</span>
+            <span>{formatDollars(amountCents)}</span>
           </div>
           <div className="flex justify-between">
             <span>Split Total:</span>
-            <span>${totalSplitAmount.toFixed(2)}</span>
+            <span>{formatDollars(totalSplitCents)}</span>
           </div>
-          {Math.abs(amountDifference) >= 0.01 && (
+          {diffCents !== 0 && (
             <div className="flex justify-between font-medium">
               <span>Difference:</span>
               <span
                 className={cn({
-                  "text-red-600": amountDifference > 0,
-                  "text-blue-600": amountDifference <= 0,
+                  "text-red-600": diffCents > 0,
+                  "text-blue-600": diffCents <= 0,
                 })}
               >
-                ${Math.abs(amountDifference).toFixed(2)}{" "}
-                {amountDifference > 0 ? "remaining" : "over"}
+                {formatDollars(Math.abs(diffCents))}{" "}
+                {diffCents > 0 ? "remaining" : "over"}
               </span>
             </div>
           )}

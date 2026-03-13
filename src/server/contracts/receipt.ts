@@ -1,9 +1,12 @@
 import { z } from "zod";
 
+/** Coerces AI dollar floats to integer cents at the parse boundary */
+const dollarsToIntCents = z.number().transform((v) => Math.round(v * 100));
+
 export const receiptItemSchema = z.object({
   name: z.string(),
-  price: z.number(),
-  quantity: z.number().default(1),
+  price: dollarsToIntCents,
+  quantity: z.number().int().default(1),
 });
 
 const receiptCategorySchema = z
@@ -23,10 +26,10 @@ const receiptCategorySchema = z
 
 export const receiptDataSchema = z.object({
   items: z.array(receiptItemSchema),
-  subtotal: z.number(),
-  tax: z.number(),
-  tip: z.number(),
-  total: z.number(),
+  subtotal: dollarsToIntCents,
+  tax: dollarsToIntCents,
+  tip: dollarsToIntCents,
+  total: dollarsToIntCents,
   merchantName: z.string().nullable(),
   date: z.string().nullable(),
   category: receiptCategorySchema,

@@ -9,6 +9,7 @@ import { Card, CardContent } from "~/components/ui/card";
 import SettleUpModal from "~/components/settle-up-modal";
 import type { GetGroupResponse, GroupMember } from "~/server/contracts/groups";
 import { cn } from "~/lib/utils";
+import { formatDollars } from "~/lib/money";
 
 interface BalancesTabProps {
   group: GetGroupResponse;
@@ -43,11 +44,11 @@ export default function BalancesTab({ group, isFetching }: BalancesTabProps) {
     if (!fromMember || !toMember) continue;
 
     const owes = owesByUser.get(settlement.fromUserId) ?? [];
-    owes.push({ to: toMember, amount: settlement.amount });
+    owes.push({ to: toMember, amount: settlement.amount.cents });
     owesByUser.set(settlement.fromUserId, owes);
 
     const owed = owedToUser.get(settlement.toUserId) ?? [];
-    owed.push({ from: fromMember, amount: settlement.amount });
+    owed.push({ from: fromMember, amount: settlement.amount.cents });
     owedToUser.set(settlement.toUserId, owed);
   }
 
@@ -55,11 +56,11 @@ export default function BalancesTab({ group, isFetching }: BalancesTabProps) {
   const membersWithBalances = group.members
     .filter((m) => {
       const balance = group.balances[m.id];
-      return balance && Math.abs(balance.netBalance) > 0.01;
+      return balance && Math.abs(balance.netBalance.cents) > 0;
     })
     .sort((a, b) => {
-      const balA = group.balances[a.id]?.netBalance ?? 0;
-      const balB = group.balances[b.id]?.netBalance ?? 0;
+      const balA = group.balances[a.id]?.netBalance.cents ?? 0;
+      const balB = group.balances[b.id]?.netBalance.cents ?? 0;
       return balB - balA; // Creditors first, then debtors
     });
 
@@ -103,7 +104,7 @@ export default function BalancesTab({ group, isFetching }: BalancesTabProps) {
                   <div className="bg-border h-px flex-1" />
                   <div className="border-border bg-muted/50 flex items-center gap-1.5 rounded-full border px-3 py-1">
                     <span className="text-foreground text-xs font-semibold">
-                      ${settlement.amount.toFixed(2)}
+                      {formatDollars(settlement.amount.cents)}
                     </span>
                     <ArrowRight className="text-muted-foreground h-3 w-3" />
                   </div>
@@ -131,7 +132,7 @@ export default function BalancesTab({ group, isFetching }: BalancesTabProps) {
                         fromUserName: `${from.firstName} ${from.lastName}`,
                         toUserId: settlement.toUserId,
                         toUserName: `${to.firstName} ${to.lastName}`,
-                        amount: settlement.amount,
+                        amount: settlement.amount.cents,
                         toVenmoUsername: to.venmoUsername,
                         toCashappUsername: to.cashappUsername,
                         toZelleUsername: to.zelleUsername,
@@ -153,7 +154,7 @@ export default function BalancesTab({ group, isFetching }: BalancesTabProps) {
         <div className="space-y-2">
           {membersWithBalances.map((member) => {
             const balance = group.balances[member.id]!;
-            const isCreditor = balance.netBalance > 0;
+            const isCreditor = balance.netBalance.cents > 0;
             const debts = owesByUser.get(member.id) ?? [];
             const credits = owedToUser.get(member.id) ?? [];
 
@@ -184,8 +185,8 @@ export default function BalancesTab({ group, isFetching }: BalancesTabProps) {
                           })}
                         >
                           {isCreditor
-                            ? `Owed $${balance.netBalance.toFixed(2)} total`
-                            : `Owes $${Math.abs(balance.netBalance).toFixed(2)} total`}
+                            ? `Owed ${formatDollars(balance.netBalance.cents)} total`
+                            : `Owes ${formatDollars(Math.abs(balance.netBalance.cents))} total`}
                         </p>
                       </div>
                     </div>
@@ -200,7 +201,7 @@ export default function BalancesTab({ group, isFetching }: BalancesTabProps) {
                             {credit.from.firstName} {credit.from.lastName} pays them
                           </span>
                           <span className="text-xs font-medium text-green-600">
-                            +${credit.amount.toFixed(2)}
+                            +{formatDollars(credit.amount)}
                           </span>
                         </div>
                       ))}
@@ -210,7 +211,7 @@ export default function BalancesTab({ group, isFetching }: BalancesTabProps) {
                             Pays {debt.to.firstName} {debt.to.lastName}
                           </span>
                           <span className="text-xs font-medium text-red-500">
-                            -${debt.amount.toFixed(2)}
+                            -{formatDollars(debt.amount)}
                           </span>
                         </div>
                       ))}

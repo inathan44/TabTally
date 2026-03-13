@@ -7,6 +7,7 @@ import { GroupBadge } from "~/components/group-badges";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import type { GetGroupResponse } from "~/server/contracts/groups";
 import { cn } from "~/lib/utils";
+import { formatDollars } from "~/lib/money";
 
 interface MembersTabProps {
   group: GetGroupResponse;
@@ -16,7 +17,7 @@ interface MembersTabProps {
 
 export default function MembersTab({ group, joinedCount, isGroupAdmin }: MembersTabProps) {
   const getMemberBalance = (memberId: string) => {
-    return group.balances[memberId]?.netBalance ?? 0;
+    return group.balances[memberId]?.netBalance.cents ?? 0;
   };
 
   return (
@@ -68,15 +69,15 @@ export default function MembersTab({ group, joinedCount, isGroupAdmin }: Members
                         {member.firstName} {member.lastName}
                       </p>
                       <p className={cn("text-xs", {
-                        "text-green-600": balance > 0.01,
-                        "text-red-500": balance < -0.01,
-                        "text-muted-foreground": Math.abs(balance) <= 0.01,
+                        "text-green-600": balance > 0,
+                        "text-red-500": balance < 0,
+                        "text-muted-foreground": balance === 0,
                       })}>
-                        {Math.abs(balance) <= 0.01
+                        {balance === 0
                           ? isInvited ? "Pending invite" : isLeft ? "No longer a member" : "Settled up"
                           : balance > 0
-                            ? `Owed $${balance.toFixed(2)}`
-                            : `Owes $${Math.abs(balance).toFixed(2)}`}
+                            ? `Owed ${formatDollars(balance)}`
+                            : `Owes ${formatDollars(Math.abs(balance))}`}
                       </p>
                     </div>
                   </div>

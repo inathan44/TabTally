@@ -1010,11 +1010,11 @@ describe("groupRouter", () => {
 
         const result = await caller.group.createTransaction({
           groupId: group.id,
-          amount: 100,
+          amount: 10000,
           payerId: USER_ID,
           title: "Dinner",
           category: "FOOD",
-          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 100 }],
+          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 10000 }],
         });
 
         expect(result.error).toBeNull();
@@ -1027,12 +1027,12 @@ describe("groupRouter", () => {
 
         const result = await caller.group.createTransaction({
           groupId: group.id,
-          amount: 90,
+          amount: 9000,
           payerId: USER_ID,
           title: "Test transaction",
           transactionDetails: [
-            { recipientId: OTHER_USER_ID, amount: 45 },
-            { recipientId: THIRD_USER_ID, amount: 45 },
+            { recipientId: OTHER_USER_ID, amount: 4500 },
+            { recipientId: THIRD_USER_ID, amount: 4500 },
           ],
         });
 
@@ -1046,10 +1046,10 @@ describe("groupRouter", () => {
 
         const result = await caller.group.createTransaction({
           groupId: group.id,
-          amount: 100,
+          amount: 10000,
           payerId: USER_ID,
           title: "Test transaction",
-          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
+          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 5000 }],
         });
 
         expect(result.error).not.toBeNull();
@@ -1063,12 +1063,12 @@ describe("groupRouter", () => {
 
         const result = await caller.group.createTransaction({
           groupId: group.id,
-          amount: 100,
+          amount: 10000,
           payerId: USER_ID,
           title: "Test transaction",
           transactionDetails: [
-            { recipientId: OTHER_USER_ID, amount: 50 },
-            { recipientId: OTHER_USER_ID, amount: 50 },
+            { recipientId: OTHER_USER_ID, amount: 5000 },
+            { recipientId: OTHER_USER_ID, amount: 5000 },
           ],
         });
 
@@ -1083,10 +1083,10 @@ describe("groupRouter", () => {
 
         const result = await caller.group.createTransaction({
           groupId: group.id,
-          amount: 50,
+          amount: 5000,
           payerId: "non-existent-payer",
           title: "Test transaction",
-          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
+          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 5000 }],
         });
 
         expect(result.error).not.toBeNull();
@@ -1100,10 +1100,10 @@ describe("groupRouter", () => {
 
         const result = await caller.group.createTransaction({
           groupId: group.id,
-          amount: 50,
+          amount: 5000,
           payerId: USER_ID,
           title: "Test transaction",
-          transactionDetails: [{ recipientId: "non-member-recipient", amount: 50 }],
+          transactionDetails: [{ recipientId: "non-member-recipient", amount: 5000 }],
         });
 
         expect(result.error).not.toBeNull();
@@ -1121,10 +1121,10 @@ describe("groupRouter", () => {
         await expect(
           thirdCaller.group.createTransaction({
             groupId: group.id,
-            amount: 50,
+            amount: 5000,
             payerId: THIRD_USER_ID,
             title: "Test transaction",
-            transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
+            transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 5000 }],
           }),
         ).rejects.toThrow(TRPCError);
       }, USER_ID);
@@ -1136,10 +1136,10 @@ describe("groupRouter", () => {
 
         const result = await caller.group.createTransaction({
           groupId: group.id,
-          amount: 80,
+          amount: 8000,
           payerId: OTHER_USER_ID,
           title: "Other paid",
-          transactionDetails: [{ recipientId: USER_ID, amount: 80 }],
+          transactionDetails: [{ recipientId: USER_ID, amount: 8000 }],
         });
 
         expect(result.error).toBeNull();
@@ -1152,10 +1152,10 @@ describe("groupRouter", () => {
 
         await caller.group.createTransaction({
           groupId: group.id,
-          amount: 25,
+          amount: 2500,
           payerId: USER_ID,
           title: "Test transaction",
-          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 25 }],
+          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 2500 }],
         });
 
         const txn = await tx.transaction.findFirst({
@@ -1179,7 +1179,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           payerId: USER_ID,
           recipientId: OTHER_USER_ID,
-          amount: 50,
+          amount: 5000,
         });
 
         expect(result.error).toBeNull();
@@ -1188,7 +1188,7 @@ describe("groupRouter", () => {
           where: { groupId: group.id, isSettlement: true },
         });
         expect(settlement).not.toBeNull();
-        expect(settlement!.amount.toNumber()).toBe(-50);
+        expect(settlement!.amount).toBe(-5000);
       }, USER_ID);
     });
 
@@ -1200,7 +1200,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           payerId: USER_ID,
           recipientId: USER_ID,
-          amount: 50,
+          amount: 5000,
         });
 
         expect(result.error).not.toBeNull();
@@ -1222,7 +1222,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           payerId: USER_ID,
           recipientId: OTHER_USER_ID,
-          amount: 50,
+          amount: 5000,
         });
 
         expect(result.error).not.toBeNull();
@@ -1240,7 +1240,7 @@ describe("groupRouter", () => {
           groupId: group.id,
           payerId: USER_ID,
           recipientId: OTHER_USER_ID,
-          amount: 30,
+          amount: 3000,
         });
 
         expect(result.error).toBeNull();
@@ -1256,12 +1256,12 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 100,
+            amount: 10000,
             payerId: USER_ID,
             createdById: USER_ID,
             title: "Test transaction",
             transactionDetails: {
-              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 100 },
+              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 10000 },
             },
           },
         });
@@ -1269,16 +1269,16 @@ describe("groupRouter", () => {
         const result = await caller.group.updateTransaction({
           groupId: group.id,
           transactionId: txn.id,
-          amount: 200,
+          amount: 20000,
           payerId: USER_ID,
           title: "Test transaction",
-          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 200 }],
+          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 20000 }],
         });
 
         expect(result.error).toBeNull();
 
         const updated = await tx.transaction.findUnique({ where: { id: txn.id } });
-        expect(updated!.amount.toNumber()).toBe(200);
+        expect(updated!.amount).toBe(20000);
       }, USER_ID);
     });
 
@@ -1290,12 +1290,12 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 60,
+            amount: 6000,
             payerId: OTHER_USER_ID,
             createdById: OTHER_USER_ID,
             title: "Test transaction",
             transactionDetails: {
-              create: { recipientId: USER_ID, groupId: group.id, amount: 60 },
+              create: { recipientId: USER_ID, groupId: group.id, amount: 6000 },
             },
           },
         });
@@ -1304,10 +1304,10 @@ describe("groupRouter", () => {
         const result = await caller.group.updateTransaction({
           groupId: group.id,
           transactionId: txn.id,
-          amount: 80,
+          amount: 8000,
           payerId: OTHER_USER_ID,
           title: "Test transaction",
-          transactionDetails: [{ recipientId: USER_ID, amount: 80 }],
+          transactionDetails: [{ recipientId: USER_ID, amount: 8000 }],
         });
 
         expect(result.error).toBeNull();
@@ -1321,12 +1321,12 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 50,
+            amount: 5000,
             payerId: USER_ID,
             createdById: USER_ID,
             title: "Test transaction",
             transactionDetails: {
-              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
+              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 5000 },
             },
           },
         });
@@ -1336,10 +1336,10 @@ describe("groupRouter", () => {
         const result = await otherCaller.group.updateTransaction({
           groupId: group.id,
           transactionId: txn.id,
-          amount: 50,
+          amount: 5000,
           payerId: USER_ID,
           title: "Test transaction",
-          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
+          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 5000 }],
         });
 
         expect(result.error).not.toBeNull();
@@ -1354,13 +1354,13 @@ describe("groupRouter", () => {
         const settlement = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: -50,
+            amount: -5000,
             payerId: USER_ID,
             createdById: USER_ID,
             title: "Test transaction",
             isSettlement: true,
             transactionDetails: {
-              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: -50 },
+              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: -5000 },
             },
           },
         });
@@ -1368,10 +1368,10 @@ describe("groupRouter", () => {
         const result = await caller.group.updateTransaction({
           groupId: group.id,
           transactionId: settlement.id,
-          amount: 50,
+          amount: 5000,
           payerId: USER_ID,
           title: "Test transaction",
-          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
+          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 5000 }],
         });
 
         expect(result.error).not.toBeNull();
@@ -1386,10 +1386,10 @@ describe("groupRouter", () => {
         const result = await caller.group.updateTransaction({
           groupId: group.id,
           transactionId: 999999,
-          amount: 50,
+          amount: 5000,
           payerId: USER_ID,
           title: "Test transaction",
-          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 50 }],
+          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 5000 }],
         });
 
         expect(result.error).not.toBeNull();
@@ -1403,12 +1403,12 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 100,
+            amount: 10000,
             payerId: USER_ID,
             createdById: USER_ID,
             title: "Test transaction",
             transactionDetails: {
-              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 100 },
+              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 10000 },
             },
           },
         });
@@ -1416,10 +1416,10 @@ describe("groupRouter", () => {
         const result = await caller.group.updateTransaction({
           groupId: group.id,
           transactionId: txn.id,
-          amount: 100,
+          amount: 10000,
           payerId: USER_ID,
           title: "Test transaction",
-          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 70 }],
+          transactionDetails: [{ recipientId: OTHER_USER_ID, amount: 7000 }],
         });
 
         expect(result.error).not.toBeNull();
@@ -1436,12 +1436,12 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 50,
+            amount: 5000,
             payerId: USER_ID,
             createdById: USER_ID,
             title: "Test transaction",
             transactionDetails: {
-              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
+              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 5000 },
             },
           },
         });
@@ -1464,12 +1464,12 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 50,
+            amount: 5000,
             payerId: OTHER_USER_ID,
             createdById: OTHER_USER_ID,
             title: "Test transaction",
             transactionDetails: {
-              create: { recipientId: USER_ID, groupId: group.id, amount: 50 },
+              create: { recipientId: USER_ID, groupId: group.id, amount: 5000 },
             },
           },
         });
@@ -1490,12 +1490,12 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 50,
+            amount: 5000,
             payerId: USER_ID,
             createdById: USER_ID,
             title: "Test transaction",
             transactionDetails: {
-              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
+              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 5000 },
             },
           },
         });
@@ -1531,13 +1531,13 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 50,
+            amount: 5000,
             payerId: USER_ID,
             createdById: USER_ID,
             title: "Test transaction",
             deletedAt: new Date(),
             transactionDetails: {
-              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
+              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 5000 },
             },
           },
         });
@@ -1561,13 +1561,13 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 50,
+            amount: 5000,
             payerId: USER_ID,
             createdById: USER_ID,
             title: "Test transaction",
             deletedAt: new Date(),
             transactionDetails: {
-              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
+              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 5000 },
             },
           },
         });
@@ -1590,13 +1590,13 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 50,
+            amount: 5000,
             payerId: USER_ID,
             createdById: USER_ID,
             title: "Test transaction",
             deletedAt: new Date(),
             transactionDetails: {
-              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
+              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 5000 },
             },
           },
         });
@@ -1618,12 +1618,12 @@ describe("groupRouter", () => {
         const txn = await tx.transaction.create({
           data: {
             groupId: group.id,
-            amount: 50,
+            amount: 5000,
             payerId: USER_ID,
             createdById: USER_ID,
             title: "Test transaction",
             transactionDetails: {
-              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 50 },
+              create: { recipientId: OTHER_USER_ID, groupId: group.id, amount: 5000 },
             },
           },
         });
@@ -1647,8 +1647,8 @@ describe("groupRouter", () => {
 
         await tx.transaction.createMany({
           data: [
-            { groupId: group.id, amount: 50, payerId: USER_ID, createdById: USER_ID , title: "Test transaction" },
-            { groupId: group.id, amount: 30, payerId: OTHER_USER_ID, createdById: OTHER_USER_ID , title: "Test transaction" },
+            { groupId: group.id, amount: 5000, payerId: USER_ID, createdById: USER_ID , title: "Test transaction" },
+            { groupId: group.id, amount: 3000, payerId: OTHER_USER_ID, createdById: OTHER_USER_ID , title: "Test transaction" },
           ],
         });
 
@@ -1665,10 +1665,10 @@ describe("groupRouter", () => {
 
         await tx.transaction.createMany({
           data: [
-            { groupId: group.id, amount: 50, payerId: USER_ID, createdById: USER_ID , title: "Test transaction" },
+            { groupId: group.id, amount: 5000, payerId: USER_ID, createdById: USER_ID , title: "Test transaction" },
             {
               groupId: group.id,
-              amount: 30,
+              amount: 3000,
               payerId: USER_ID,
               createdById: USER_ID,
               title: "Test transaction",
@@ -1692,7 +1692,7 @@ describe("groupRouter", () => {
           data: [
             {
               groupId: group.id,
-              amount: 50,
+              amount: 5000,
               payerId: USER_ID,
               createdById: USER_ID,
               title: "Test transaction",
@@ -1700,7 +1700,7 @@ describe("groupRouter", () => {
             },
             {
               groupId: group.id,
-              amount: 30,
+              amount: 3000,
               payerId: USER_ID,
               createdById: USER_ID,
               title: "Test transaction",
@@ -1726,8 +1726,8 @@ describe("groupRouter", () => {
 
         await tx.transaction.createMany({
           data: [
-            { groupId: group.id, amount: 50, payerId: USER_ID, createdById: USER_ID , title: "Test transaction" },
-            { groupId: group.id, amount: 30, payerId: OTHER_USER_ID, createdById: OTHER_USER_ID , title: "Test transaction" },
+            { groupId: group.id, amount: 5000, payerId: USER_ID, createdById: USER_ID , title: "Test transaction" },
+            { groupId: group.id, amount: 3000, payerId: OTHER_USER_ID, createdById: OTHER_USER_ID , title: "Test transaction" },
           ],
         });
 
@@ -1750,7 +1750,7 @@ describe("groupRouter", () => {
           data: [
             {
               groupId: group.id,
-              amount: 50,
+              amount: 5000,
               payerId: USER_ID,
               createdById: USER_ID,
               title: "Test transaction",
@@ -1758,7 +1758,7 @@ describe("groupRouter", () => {
             },
             {
               groupId: group.id,
-              amount: 30,
+              amount: 3000,
               payerId: USER_ID,
               createdById: USER_ID,
               title: "Test transaction",
@@ -1786,14 +1786,14 @@ describe("groupRouter", () => {
           data: [
             {
               groupId: group.id,
-              amount: 50,
+              amount: 5000,
               payerId: USER_ID,
               createdById: USER_ID,
               title: "Pizza night",
             },
             {
               groupId: group.id,
-              amount: 30,
+              amount: 3000,
               payerId: USER_ID,
               createdById: USER_ID,
               title: "Gas station",
@@ -1819,7 +1819,7 @@ describe("groupRouter", () => {
           data: [
             {
               groupId: group.id,
-              amount: 50,
+              amount: 5000,
               payerId: USER_ID,
               createdById: USER_ID,
               title: "Test transaction",
@@ -1827,7 +1827,7 @@ describe("groupRouter", () => {
             },
             {
               groupId: group.id,
-              amount: 30,
+              amount: 3000,
               payerId: USER_ID,
               createdById: USER_ID,
               title: "Test transaction",

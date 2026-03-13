@@ -1,6 +1,7 @@
 import type { Transaction } from "@prisma/client";
 import type { SafeTransactionDetail } from "./transactionDetail";
 import type { SafeUser } from "./users";
+import type { Money } from "~/lib/money";
 
 export type SafeTransaction = Omit<
   Pick<
@@ -15,10 +16,11 @@ export type SafeTransaction = Omit<
     | "transactionDate"
     | "category"
     | "receiptUrl"
+    | "amount"
   >,
   "amount"
 > & {
-  amount: number; // Convert Decimal to number for client serialization
+  amount: Money;
   transactionDetails: SafeTransactionDetail[];
   payer: SafeUser;
   createdBy: SafeUser;

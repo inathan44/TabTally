@@ -29,6 +29,7 @@ import TransactionManualForm from "./transaction-manual-form";
 import TransactionReceiptForm from "./transaction-receipt-form";
 import { getDialogDescription, getUploadErrorMessage } from "./transaction-form-helpers";
 import { compressImage } from "~/lib/compress-image";
+import { formatDollars, centsToFormValue, dollarsToCents, splitCentsEvenly, parseDollarsToCents } from "~/lib/money";
 
 export type CreateTransactionForm = z.infer<typeof createTransactionFormSchema>;
 
@@ -71,14 +72,14 @@ export default function CreateTransactionModal({
 
   const defaultValues = isEditMode
     ? {
-        amount: Math.abs(Number(editTransaction.amount)).toFixed(2),
+        amount: centsToFormValue(editTransaction.amount.cents),
         title: editTransaction.title,
         category: editTransaction.category ?? null,
         payerId: editTransaction.payerId,
         transactionDate: new Date(editTransaction.transactionDate),
         splits: editTransaction.transactionDetails.map((d) => ({
           recipientId: d.recipientId,
-          amount: Math.abs(Number(d.amount)).toFixed(2),
+          amount: centsToFormValue(d.amount.cents),
         })),
       }
     : {
@@ -151,18 +152,13 @@ export default function CreateTransactionModal({
   const equalSplit = () => {
     const amount = form.getValues("amount");
     const splits = form.getValues("splits");
-    const amountValue = parseFloat(amount || "0");
-    if (amountValue > 0 && splits.length > 0) {
-      const totalCents = Math.round(amountValue * 100);
-      const splitCount = splits.length;
-      const baseCents = Math.floor(totalCents / splitCount);
-      const remainderCents = totalCents % splitCount;
-
-      const updatedSplits = splits.map((split, index) => {
-        const splitCents = baseCents + (index < remainderCents ? 1 : 0);
-        return { ...split, amount: (splitCents / 100).toFixed(2) };
-      });
-
+    const totalCents = parseDollarsToCents(amount || "0");
+    if (totalCents > 0 && splits.length > 0) {
+      const centsParts = splitCentsEvenly(totalCents, splits.length);
+      const updatedSplits = splits.map((split, index) => ({
+        ...split,
+        amount: centsToFormValue(centsParts[index]!),
+      }));
       replace(updatedSplits);
     }
   };
@@ -188,7 +184,7 @@ export default function CreateTransactionModal({
 
       if (result.data) {
         setParsedReceipt(result.data);
-        form.setValue("amount", result.data.total.toFixed(2));
+        form.setValue("amount", centsToFormValue(result.data.total));
         if (result.data.merchantName) {
           form.setValue("title", result.data.merchantName);
         }
@@ -216,7 +212,7 @@ export default function CreateTransactionModal({
       replace(
         splits.map((s) => ({
           recipientId: s.recipientId,
-          amount: s.amount.toFixed(2),
+          amount: centsToFormValue(s.amount),
         })),
       );
     },
@@ -225,8 +221,8 @@ export default function CreateTransactionModal({
 
   const handleReceiptDataChange = useCallback(
     (updated: ReceiptData) => {
-      const newTotal = updated.subtotal + updated.tax + updated.tip;
-      form.setValue("amount", newTotal.toFixed(2));
+      const newTotalCents = updated.subtotal + updated.tax + updated.tip;
+      form.setValue("amount", centsToFormValue(newTotalCents));
     },
     [form],
   );
@@ -235,24 +231,23 @@ export default function CreateTransactionModal({
     try {
       setTransactionError(null);
 
-      const amountValue = parseFloat(values.amount);
+      const amountCents = dollarsToCents(values.amount);
       const splitValues = values.splits.map((split) => ({
         recipientId: split.recipientId,
-        amount: parseFloat(split.amount),
+        amount: dollarsToCents(split.amount),
       }));
 
-      const totalSplitCents = splitValues.reduce((sum, split) => sum + Math.round(split.amount * 100), 0);
-      const totalAmountCents = Math.round(amountValue * 100);
-      if (totalSplitCents !== totalAmountCents) {
+      const totalSplitCents = splitValues.reduce((sum, split) => sum + split.amount, 0);
+      if (totalSplitCents !== amountCents) {
         setTransactionError(
-          `Split amounts ($${(totalSplitCents / 100).toFixed(2)}) must equal the total amount ($${amountValue.toFixed(2)})`,
+          `Split amounts (${formatDollars(totalSplitCents)}) must equal the total amount (${formatDollars(amountCents)})`,
         );
         return;
       }
 
       const basePayload = {
         groupId,
-        amount: amountValue,
+        amount: amountCents,
         title: values.title,
         category: values.category,
         receiptUrl: receipt.url,

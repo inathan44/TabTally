@@ -26,6 +26,7 @@ import { DollarSign, ArrowRight, ExternalLink } from "lucide-react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { api } from "~/trpc/react";
 import { AnimatedButton } from "./ui/animated-button";
+import { centsToFormValue, dollarsToCents } from "~/lib/money";
 
 const settleUpFormSchema = z.object({
   amount: z
@@ -77,7 +78,7 @@ export default function SettleUpModal({
   const form = useForm<SettleUpForm>({
     resolver: zodResolver(settleUpFormSchema),
     defaultValues: {
-      amount: suggestedAmount > 0 ? suggestedAmount.toFixed(2) : "",
+      amount: suggestedAmount > 0 ? centsToFormValue(suggestedAmount) : "",
     },
   });
 
@@ -87,13 +88,13 @@ export default function SettleUpModal({
 
   const onSubmit = async (data: SettleUpForm) => {
     setError(null);
-    const amount = parseFloat(data.amount);
+    const amountCents = dollarsToCents(data.amount);
 
     const result = await settleMutation.mutateAsync({
       groupId,
       payerId: fromUserId,
       recipientId: toUserId,
-      amount,
+      amount: amountCents,
     });
 
     if (result.error) {
@@ -110,7 +111,7 @@ export default function SettleUpModal({
   const handleOpenChange = (newOpen: boolean) => {
     onOpenChange(newOpen);
     if (!newOpen) {
-      form.reset({ amount: suggestedAmount > 0 ? suggestedAmount.toFixed(2) : "" });
+      form.reset({ amount: suggestedAmount > 0 ? centsToFormValue(suggestedAmount) : "" });
       setError(null);
       settleMutation.reset();
     }

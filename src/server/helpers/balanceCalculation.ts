@@ -1,10 +1,10 @@
 import type {
-  BalanceCalculationResult,
-  Settlement,
-  UserBalance,
+  RawBalanceCalculationResult,
+  RawSettlement,
+  RawUserBalance,
 } from "~/server/contracts/balances";
 
-// Helper method to calculate balances from transaction data
+// All amounts are in integer cents throughout.
 export function calculateGroupBalances(
   transactions: Array<{
     payerId: string;
@@ -14,10 +14,9 @@ export function calculateGroupBalances(
       amount: number;
     }>;
   }>,
-): BalanceCalculationResult {
-  const userBalances: Record<string, UserBalance> = {};
+): RawBalanceCalculationResult {
+  const userBalances: Record<string, RawUserBalance> = {};
 
-  // Initialize user balances for all users involved
   const allUserIds = new Set<string>();
   transactions.forEach((transaction) => {
     allUserIds.add(transaction.payerId);
@@ -34,7 +33,7 @@ export function calculateGroupBalances(
     };
   });
 
-  // Calculate totals for each user (use absolute values since settlements are stored negative)
+  // Accumulate totals (use absolute values since settlements are stored negative)
   transactions.forEach((transaction) => {
     userBalances[transaction.payerId]!.totalPaid += Math.abs(transaction.amount);
     transaction.transactionDetails.forEach((detail) => {
@@ -42,12 +41,10 @@ export function calculateGroupBalances(
     });
   });
 
-  // Calculate net balances
   Object.values(userBalances).forEach((balance) => {
     balance.netBalance = balance.totalPaid - balance.totalOwed;
   });
 
-  // Generate settlement plan using debt simplification algorithm
   const settlementPlan = generateSettlementPlan(userBalances);
 
   return {
@@ -59,37 +56,32 @@ export function calculateGroupBalances(
 // Generates a settlement plan that minimizes the number of transactions.
 // Uses zero-sum subset partitioning (bitmask DP) for groups ≤ 15 non-zero balances,
 // falls back to greedy for larger groups.
-// All internal arithmetic uses integer cents to avoid floating-point errors.
-export function generateSettlementPlan(userBalances: Record<string, UserBalance>): Settlement[] {
+// Input balances are already in integer cents.
+export function generateSettlementPlan(userBalances: Record<string, RawUserBalance>): RawSettlement[] {
   const entries: Array<{ userId: string; cents: number }> = [];
 
   Object.entries(userBalances).forEach(([userId, balance]) => {
-    const cents = Math.round(balance.netBalance * 100);
-    if (Math.abs(cents) >= 1) {
-      entries.push({ userId, cents });
+    if (Math.abs(balance.netBalance) >= 1) {
+      entries.push({ userId, cents: balance.netBalance });
     }
   });
 
   if (entries.length === 0) return [];
 
-  // Ensure entries are zero-sum. Rounding to cents can introduce a gap
-  // (e.g. $10 split 3 ways: +667¢ -333¢ -333¢ = +1¢).
+  // Ensure entries are zero-sum. Rounding at input boundaries can introduce a gap.
   // Distribute the gap across the largest entries to preserve fairness.
   const totalCents = entries.reduce((s, e) => s + e.cents, 0);
   if (totalCents !== 0) {
     const step = totalCents > 0 ? -1 : 1;
-    // Sort by absolute value descending — largest balances absorb the rounding
     const sorted = [...entries].sort((a, b) => Math.abs(b.cents) - Math.abs(a.cents));
     let remaining = Math.abs(totalCents);
     for (let i = 0; remaining > 0 && i < sorted.length; i++) {
       sorted[i]!.cents += step;
-      // Update the userBalances so the caller sees consistent data
-      userBalances[sorted[i]!.userId]!.netBalance = sorted[i]!.cents / 100;
+      userBalances[sorted[i]!.userId]!.netBalance = sorted[i]!.cents;
       remaining--;
     }
   }
 
-  // Bitmask DP is O(3^n); practical up to ~15 people
   if (entries.length > 15) {
     return greedySettlements(entries);
   }
@@ -100,7 +92,7 @@ export function generateSettlementPlan(userBalances: Record<string, UserBalance>
 // Finds the minimum-transaction settlement via zero-sum subset partitioning.
 // n people with non-zero balances need exactly (n - k) transactions,
 // where k is the maximum number of independent zero-sum subsets.
-function optimalSettlements(entries: Array<{ userId: string; cents: number }>): Settlement[] {
+function optimalSettlements(entries: Array<{ userId: string; cents: number }>): RawSettlement[] {
   const n = entries.length;
   const amountsCents = entries.map((e) => e.cents);
 
@@ -164,7 +156,7 @@ function optimalSettlements(entries: Array<{ userId: string; cents: number }>): 
   }
 
   // Within each zero-sum group, greedy produces exactly (groupSize - 1) transactions
-  const settlements: Settlement[] = [];
+  const settlements: RawSettlement[] = [];
   for (const group of groups) {
     const groupEntries = group.map((i) => ({ userId: entries[i]!.userId, cents: entries[i]!.cents }));
     settlements.push(...greedySettlements(groupEntries));
@@ -175,8 +167,8 @@ function optimalSettlements(entries: Array<{ userId: string; cents: number }>): 
 
 // Greedy settlement in integer cents: match largest creditor with largest debtor.
 // Expects zero-sum input (gap already balanced by generateSettlementPlan).
-function greedySettlements(entries: Array<{ userId: string; cents: number }>): Settlement[] {
-  const settlements: Settlement[] = [];
+function greedySettlements(entries: Array<{ userId: string; cents: number }>): RawSettlement[] {
+  const settlements: RawSettlement[] = [];
   const creditors: Array<{ userId: string; cents: number }> = [];
   const debtors: Array<{ userId: string; cents: number }> = [];
 
@@ -203,7 +195,7 @@ function greedySettlements(entries: Array<{ userId: string; cents: number }>): S
       settlements.push({
         fromUserId: debtor.userId,
         toUserId: creditor.userId,
-        amount: cents / 100,
+        amount: cents,
       });
     }
 

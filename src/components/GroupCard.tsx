@@ -4,6 +4,7 @@ import { Crown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { api } from "~/trpc/react";
 import { cn } from "~/lib/utils";
+import { formatDollars } from "~/lib/money";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 interface GroupCardProps {
@@ -32,7 +33,7 @@ export function GroupCard({
     void utils.group.getGroupBySlug.prefetch({ slug });
   };
 
-  const formatBalance = (amount: number) => `$${Math.abs(amount).toFixed(2)}`;
+  const formatBalance = (amount: number) => formatDollars(Math.abs(amount));
 
   const getBalanceText = () => {
     if (balance === 0) return "Settled up";

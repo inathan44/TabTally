@@ -16,6 +16,7 @@ import type { GetGroupResponse } from "~/server/contracts/groups";
 import { transactionCategoryLabels, transactionCategories } from "~/server/contracts/groups";
 import type { SafeTransaction } from "~/server/contracts/transactions";
 import { cn } from "~/lib/utils";
+import { formatDollars } from "~/lib/money";
 
 interface TransactionsTabProps {
   group: GetGroupResponse;
@@ -111,17 +112,16 @@ export default function TransactionsTab({
   ): { label: string; className: string } | null => {
     if (!userId || transaction.isSettlement) return null;
 
-    const amountPaid = transaction.payerId === userId ? Number(transaction.amount) : 0;
-    const amountOwed = Number(
-      transaction.transactionDetails.find((d) => d.recipientId === userId)?.amount ?? 0,
-    );
+    const amountPaid = transaction.payerId === userId ? transaction.amount.cents : 0;
+    const amountOwed =
+      transaction.transactionDetails.find((d) => d.recipientId === userId)?.amount.cents ?? 0;
     const net = amountPaid - amountOwed;
 
     if (net > 0) {
-      return { label: `You are owed $${net.toFixed(2)}`, className: "text-green-600" };
+      return { label: `You are owed ${formatDollars(net)}`, className: "text-green-600" };
     }
     if (net < 0) {
-      return { label: `You owe $${Math.abs(net).toFixed(2)}`, className: "text-orange-600" };
+      return { label: `You owe ${formatDollars(Math.abs(net))}`, className: "text-orange-600" };
     }
 
     return null;
@@ -137,7 +137,7 @@ export default function TransactionsTab({
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Total spent</p>
-              <p className="text-foreground text-sm font-semibold">${totalSpending.toFixed(2)}</p>
+              <p className="text-foreground text-sm font-semibold">{formatDollars(totalSpending)}</p>
             </div>
           </div>
         )}
@@ -214,7 +214,7 @@ export default function TransactionsTab({
                           "text-foreground": !transaction.isSettlement,
                         })}
                       >
-                        ${Math.abs(Number(transaction.amount)).toFixed(2)}
+                        {formatDollars(Math.abs(transaction.amount.cents))}
                       </p>
                       {share && <p className={cn("text-xs", share.className)}>{share.label}</p>}
                     </div>

@@ -40,8 +40,82 @@ import {
 } from "~/server/contracts/groups";
 import type { CreateTransactionDetail } from "~/server/contracts/transactionDetail";
 import type { SafeTransaction } from "~/server/contracts/transactions";
-import type { BalanceCalculationResult, UserBalance } from "~/server/contracts/balances";
+import type {
+  BalanceCalculationResult,
+  UserBalance,
+  RawBalanceCalculationResult,
+} from "~/server/contracts/balances";
+import { toMoney } from "~/lib/money";
 import { calculateGroupBalances } from "~/server/helpers/balanceCalculation";
+
+// Maps raw DB transaction → SafeTransaction with Money amounts
+function mapTransaction(tx: {
+  id: number;
+  amount: number;
+  title: string;
+  category: TransactionCategory | null;
+  receiptUrl: string | null;
+  isSettlement: boolean;
+  transactionDate: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  createdById: string;
+  payerId: string;
+  createdBy: { id: string; username: string | null; firstName: string; lastName: string; createdAt: Date };
+  payer: { id: string; username: string | null; firstName: string; lastName: string; createdAt: Date };
+  transactionDetails: Array<{
+    id: number;
+    recipientId: string;
+    amount: number;
+    createdAt: Date;
+    updatedAt: Date;
+    recipient: { id: string; username: string | null; firstName: string; lastName: string; createdAt: Date };
+  }>;
+}): SafeTransaction {
+  return {
+    id: tx.id,
+    amount: toMoney(tx.amount),
+    title: tx.title,
+    category: tx.category,
+    receiptUrl: tx.receiptUrl,
+    isSettlement: tx.isSettlement,
+    transactionDate: tx.transactionDate,
+    createdAt: tx.createdAt,
+    updatedAt: tx.updatedAt,
+    createdById: tx.createdById,
+    payerId: tx.payerId,
+    createdBy: tx.createdBy,
+    payer: tx.payer,
+    transactionDetails: tx.transactionDetails.map((d) => ({
+      id: d.id,
+      recipientId: d.recipientId,
+      amount: toMoney(d.amount),
+      createdAt: d.createdAt,
+      updatedAt: d.updatedAt,
+      recipient: d.recipient,
+    })),
+  };
+}
+
+// Maps raw balance result → Money-typed balance result
+function mapBalances(raw: RawBalanceCalculationResult): BalanceCalculationResult {
+  const userBalances: Record<string, UserBalance> = {};
+  for (const [userId, b] of Object.entries(raw.userBalances)) {
+    userBalances[userId] = {
+      totalPaid: toMoney(b.totalPaid),
+      totalOwed: toMoney(b.totalOwed),
+      netBalance: toMoney(b.netBalance),
+    };
+  }
+  return {
+    userBalances,
+    settlementPlan: raw.settlementPlan.map((s) => ({
+      fromUserId: s.fromUserId,
+      toUserId: s.toUserId,
+      amount: toMoney(s.amount),
+    })),
+  };
+}
 
 export const groupRouter = createTRPCRouter({
   createGroup: protectedProcedure
@@ -260,10 +334,10 @@ export const groupRouter = createTRPCRouter({
       const balanceData = calculateGroupBalances(
         group.transactions.map((t) => ({
           payerId: t.payerId,
-          amount: t.amount.toNumber(),
+          amount: t.amount,
           transactionDetails: t.transactionDetails.map((d) => ({
             recipientId: d.recipientId,
-            amount: d.amount.toNumber(),
+            amount: d.amount,
           })),
         })),
       );
@@ -271,7 +345,7 @@ export const groupRouter = createTRPCRouter({
       const memberIds = new Set(group.members.map((m) => m.member.id));
       const formerMemberIds = Object.entries(balanceData.userBalances)
         .filter(
-          ([userId, balance]) => !memberIds.has(userId) && Math.abs(balance.netBalance) > 0.01,
+          ([userId, balance]) => !memberIds.has(userId) && Math.abs(balance.netBalance) > 0,
         )
         .map(([userId]) => userId);
 
@@ -297,6 +371,7 @@ export const groupRouter = createTRPCRouter({
         }
       }
 
+      const mappedBalances = mapBalances(balanceData);
       const groupResponse: GetGroupResponse = {
         id: group.id,
         name: group.name,
@@ -312,31 +387,9 @@ export const groupRouter = createTRPCRouter({
           })),
           ...formerMembers,
         ],
-        transactions: group.transactions.map((transaction) => ({
-          id: transaction.id,
-          amount: transaction.amount.toNumber(),
-          title: transaction.title,
-          category: transaction.category,
-          receiptUrl: transaction.receiptUrl,
-          isSettlement: transaction.isSettlement,
-          transactionDate: transaction.transactionDate,
-          createdAt: transaction.createdAt,
-          updatedAt: transaction.updatedAt,
-          createdById: transaction.createdById,
-          payerId: transaction.payerId,
-          createdBy: transaction.createdBy,
-          payer: transaction.payer,
-          transactionDetails: transaction.transactionDetails.map((detail) => ({
-            id: detail.id,
-            recipientId: detail.recipientId,
-            amount: detail.amount.toNumber(),
-            createdAt: detail.createdAt,
-            updatedAt: detail.updatedAt,
-            recipient: detail.recipient,
-          })),
-        })),
-        balances: balanceData.userBalances,
-        settlements: balanceData.settlementPlan,
+        transactions: group.transactions.map(mapTransaction),
+        balances: mappedBalances.userBalances,
+        settlements: mappedBalances.settlementPlan,
       };
 
       return { data: groupResponse, error: null };
@@ -447,29 +500,7 @@ export const groupRouter = createTRPCRouter({
         };
       }
 
-      const mapped: SafeTransaction[] = transactions.map((transaction) => ({
-        id: transaction.id,
-        amount: transaction.amount.toNumber(),
-        title: transaction.title,
-        category: transaction.category,
-        receiptUrl: transaction.receiptUrl,
-        isSettlement: transaction.isSettlement,
-        transactionDate: transaction.transactionDate,
-        createdAt: transaction.createdAt,
-        updatedAt: transaction.updatedAt,
-        createdById: transaction.createdById,
-        payerId: transaction.payerId,
-        createdBy: transaction.createdBy,
-        payer: transaction.payer,
-        transactionDetails: transaction.transactionDetails.map((detail) => ({
-          id: detail.id,
-          recipientId: detail.recipientId,
-          amount: detail.amount.toNumber(),
-          createdAt: detail.createdAt,
-          updatedAt: detail.updatedAt,
-          recipient: detail.recipient,
-        })),
-      }));
+      const mapped: SafeTransaction[] = transactions.map(mapTransaction);
 
       console.log(
         `[getGroupTransactions] Returned ${mapped.length} transactions for group ${input.groupId}`,
@@ -1734,10 +1765,10 @@ export const groupRouter = createTRPCRouter({
 
       const transformedTransactions = transactions.map((transaction) => ({
         payerId: transaction.payerId,
-        amount: transaction.amount.toNumber(),
+        amount: transaction.amount,
         transactionDetails: transaction.transactionDetails.map((detail) => ({
           recipientId: detail.recipientId,
-          amount: detail.amount.toNumber(),
+          amount: detail.amount,
         })),
       }));
 
@@ -1747,7 +1778,7 @@ export const groupRouter = createTRPCRouter({
         `[getDetailedBalances] Calculated balances for group ${input.groupId}, ${Object.keys(balanceData.userBalances).length} users`,
       );
       return {
-        data: balanceData,
+        data: mapBalances(balanceData),
         error: null,
       };
     }),
@@ -1784,10 +1815,10 @@ export const groupRouter = createTRPCRouter({
 
       const transformedTransactions = transactions.map((transaction) => ({
         payerId: transaction.payerId,
-        amount: transaction.amount.toNumber(),
+        amount: transaction.amount,
         transactionDetails: transaction.transactionDetails.map((detail) => ({
           recipientId: detail.recipientId,
-          amount: detail.amount.toNumber(),
+          amount: detail.amount,
         })),
       }));
 
@@ -1797,7 +1828,7 @@ export const groupRouter = createTRPCRouter({
         `[getSimpleBalances] Calculated balances for group ${input.groupId}, ${Object.keys(balanceData.userBalances).length} users`,
       );
       return {
-        data: balanceData.userBalances,
+        data: mapBalances(balanceData).userBalances,
         error: null,
       };
     }),
@@ -1939,11 +1970,10 @@ function verifyTransactionDetails(
     return false;
   }
 
-  const totalCents = transactionDetails.reduce((sum, detail) => sum + Math.round(detail.amount * 100), 0);
-  const expectedCents = Math.round(transactionAmount * 100);
-  if (totalCents !== expectedCents) {
+  const totalCents = transactionDetails.reduce((sum, detail) => sum + detail.amount, 0);
+  if (totalCents !== transactionAmount) {
     console.error(
-      `[verifyTransactionDetails] Split total (${totalCents}¢) does not match transaction amount (${expectedCents}¢)`,
+      `[verifyTransactionDetails] Split total (${totalCents}¢) does not match transaction amount (${transactionAmount}¢)`,
     );
     return false;
   }

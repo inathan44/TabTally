@@ -113,7 +113,7 @@ model Transaction {
   createdBy       User                 @relation("TransactionCreator", fields: [createdById], references: [id])
   payerId         String
   payer           User                 @relation("TransactionPayer", fields: [payerId], references: [id])
-  amount          Decimal              @db.Decimal(10, 2)
+  amount          Int
   title           String               @db.VarChar(100)
   category        TransactionCategory?
   receiptUrl      String?              @db.VarChar(500)
@@ -140,7 +140,7 @@ model TransactionDetail {
   recipient     User        @relation("TransactionRecipients", fields: [recipientId], references: [id])
   groupId       Int
   group         Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  amount        Decimal     @db.Decimal(10, 2)
+  amount        Int
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   deletedAt     DateTime?

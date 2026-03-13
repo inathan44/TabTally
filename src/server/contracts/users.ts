@@ -1,6 +1,8 @@
 import type { User } from "@prisma/client";
 import { z } from "zod";
 
+import type { Money } from "~/lib/money";
+
 export type SafeUser = Pick<User, "id" | "username" | "firstName" | "lastName" | "createdAt">;
 
 export type UserProfile = Pick<
@@ -24,7 +26,7 @@ export type GetUserGroupsResponse = {
   createdById: string;
   groupUsers: SafeUser[];
   userBalance?: {
-    amount: number;
+    amount: Money;
     type: "receive" | "pay";
   };
 };

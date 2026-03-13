@@ -114,7 +114,7 @@ export const restoreTransactionSchema = z.object({
 
 export const createTransactionSchema = z.object({
   groupId: groupId,
-  amount: z.number().positive("Amount must be greater than 0"),
+  amount: z.number().int("Amount must be a valid number").positive("Amount must be greater than 0"),
   payerId: z.string(),
   title: z.string().min(1, "Title is required").max(100, "Title must be 100 characters or less"),
   category: categorySchema,
@@ -133,7 +133,7 @@ export const createSettlementSchema = z.object({
   groupId: groupId,
   payerId: z.string().min(1, "Payer is required"),
   recipientId: z.string().min(1, "Recipient is required"),
-  amount: z.number().positive("Amount must be greater than 0"),
+  amount: z.number().int("Amount must be a valid number").positive("Amount must be greater than 0"),
 });
 
 // Client-side form schema for the transaction creation modal

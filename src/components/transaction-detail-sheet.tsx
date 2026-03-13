@@ -16,6 +16,7 @@ import DeleteTransactionDialog from "~/components/delete-transaction-dialog";
 import { transactionCategoryLabels } from "~/server/contracts/groups";
 import type { SafeTransaction } from "~/server/contracts/transactions";
 import { cn } from "~/lib/utils";
+import { formatDollars } from "~/lib/money";
 
 interface TransactionDetailSheetProps {
   transaction: SafeTransaction | null;
@@ -38,7 +39,7 @@ export default function TransactionDetailSheet({
 }: TransactionDetailSheetProps) {
   if (!transaction) return null;
 
-  const amount = Math.abs(Number(transaction.amount));
+  const amount = Math.abs(transaction.amount.cents);
   const userSplit = transaction.transactionDetails.find((d) => d.recipientId === userId);
   const userOwes = userSplit && transaction.payerId !== userId;
   const userPaid = transaction.payerId === userId;
@@ -71,7 +72,7 @@ export default function TransactionDetailSheet({
                 "text-foreground": !transaction.isSettlement,
               })}
             >
-              ${amount.toFixed(2)}
+              {formatDollars(amount)}
             </p>
             {transaction.category && (
               <Badge variant="secondary" className="mt-2">
@@ -124,7 +125,7 @@ export default function TransactionDetailSheet({
                           : `${detail.recipient.firstName} ${detail.recipient.lastName}`}
                       </span>
                     </div>
-                    <span className="text-sm font-medium">${Number(detail.amount).toFixed(2)}</span>
+                    <span className="text-sm font-medium">{formatDollars(detail.amount.cents)}</span>
                   </div>
                 ))}
               </div>
